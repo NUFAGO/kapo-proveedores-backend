@@ -11,8 +11,11 @@ import '../persistencia/mongo';
 export const initializeServer = async (): Promise<void> => {
   await connectDatabase();
 
-  // Siempre usar src/ para desarrollo
-  const schemasPath = path.join(process.cwd(), 'src/infraestructura/graphql/schemas/**/*.graphql');
+  // Resolver ruta de schemas GraphQL de forma robusta
+  // En desarrollo usa src/, en producción compilada usa dist/
+  const schemasPath = process.env['NODE_ENV'] === 'production'
+    ? path.join(process.cwd(), 'dist/infraestructura/graphql/schemas/**/*.graphql')
+    : path.join(process.cwd(), 'src/infraestructura/graphql/schemas/**/*.graphql');
 
   const typesArray = loadFilesSync(schemasPath, { ignoreIndex: true });
   
@@ -22,7 +25,8 @@ export const initializeServer = async (): Promise<void> => {
   logger.info('Schema cargado - verificando DateTime', {
     hasDateTime: schemaString.includes('scalar DateTime'),
     hasUpload: schemaString.includes('scalar Upload'),
-    totalFiles: typesArray.length
+    totalFiles: typesArray.length,
+    schemasPath: schemasPath
   });
   
   const resolvers = mergeResolvers(ResolverFactory.createResolvers() as unknown as Parameters<typeof mergeResolvers>[0]);

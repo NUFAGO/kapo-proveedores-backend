@@ -1,0 +1,29 @@
+# Archivos y directorios que NO queremos subir a Cloud Build
+# (pero asegurarnos de incluir archivos necesarios)
+
+# Excluir node_modules
+node_modules/
+
+# Excluir dist (se construye durante el build)
+dist/
+
+# Excluir archivos de desarrollo
+.env
+.env.local
+.env.*.local
+*.log
+npm-debug.log*
+.git/
+.gitignore
+.vscode/
+.idea/
+coverage/
+*.test.ts
+*.test.js
+*.spec.ts
+*.spec.js
+docs/
+
+# IMPORTANTE: No excluir estos archivos críticos
+# El .gcloudignore funciona diferente, necesitamos ser explícitos
+

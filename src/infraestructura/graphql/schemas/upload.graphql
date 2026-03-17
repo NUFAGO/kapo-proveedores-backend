@@ -1,0 +1,61 @@
+# ============================================================================
+# ESQUEMA GRAPHQL - UPLOAD DE ARCHIVOS
+# ============================================================================
+
+# Tipos de respuesta para subida de archivos
+type FileUploadResponse {
+  url: String!
+  filename: String!
+  originalName: String!
+  size: Int!
+  mimetype: String!
+}
+
+type BatchUploadResponse {
+  successful: [FileUploadResponse!]!
+  failed: [BatchUploadError!]!
+}
+
+type BatchUploadError {
+  filename: String
+  error: String!
+}
+
+# Inputs
+input UploadConfigInput {
+  tipo: String! # DOCUMENTOS_PROVEEDOR, LOGOS_PROVEEDOR, etc.
+  maxFileSize: Int
+  allowedTypes: [String!]
+}
+
+# Mutations
+type Mutation {
+  """
+  Sube un archivo individual al storage
+  """
+  subirArchivo(file: Upload!, config: UploadConfigInput!): FileUploadResponse!
+  
+  """
+  Sube múltiples archivos en lote
+  """
+  subirMultiplesArchivos(files: [Upload!]!, config: UploadConfigInput!): BatchUploadResponse!
+
+  """
+  Elimina un archivo del storage
+  """
+  eliminarArchivo(url: String!): Boolean!
+}
+
+# Queries
+type Query {
+  """
+  Obtiene configuración de subida por tipo
+  """
+  obtenerUploadConfig(tipo: String!): UploadConfigResponse!
+}
+
+type UploadConfigResponse {
+  maxFileSize: Int!
+  allowedTypes: [String!]!
+  accept: String!
+}

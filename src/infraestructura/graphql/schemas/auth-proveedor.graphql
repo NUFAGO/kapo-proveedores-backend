@@ -1,0 +1,55 @@
+# ============================================================================
+# SCHEMA GraphQL PARA AUTENTICACIÓN DE USUARIOS PROVEEDOR
+# ============================================================================
+
+type LoginProveedorResponse {
+  id: ID!
+  token: String!
+  usuario: String!
+  nombres: String!
+  apellido_paterno: String!
+  apellido_materno: String!
+  proveedor_id: String!
+  proveedor_nombre: String!
+  estado: UsuarioProveedorEstado!
+}
+
+type TokenVerifyResponse {
+  id: ID!
+  tipo_usuario: String!
+  proveedor_id: String
+  estado: String!
+  iat: Int
+  exp: Int
+}
+
+type TokenRefreshResponse {
+  payload: TokenVerifyResponse!
+  token: String!
+}
+
+# ============================================================================
+# MUTATIONS
+# ============================================================================
+
+extend type Mutation {
+  """
+  Login específico para usuarios proveedor
+  Requiere usuario (DNI) y contraseña
+  Retorna token JWT con información completa del proveedor
+  Solo funciona si el usuario está en estado 'activo'
+  """
+  loginProveedor(usuario: String!, contrasenna: String!): LoginProveedorResponse!
+
+  """
+  Verifica si un token de proveedor es válido
+  Retorna el payload del token sin modificar
+  """
+  verifyTokenProveedor(token: String!): TokenVerifyResponse!
+
+  """
+  Refresca un token de proveedor
+  Genera un nuevo token con la misma información pero nueva fecha de expiración
+  """
+  refreshTokenProveedor(token: String!): TokenRefreshResponse!
+}

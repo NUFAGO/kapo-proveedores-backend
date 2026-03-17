@@ -1,0 +1,54 @@
+type TipoDocumentoInfo {
+  _id: ID!
+  codigo: String!
+  nombre: String!
+  descripcion: String
+}
+
+type PlantillaDocumento {
+  id: ID!
+  codigo: String!
+  tipoDocumentoId: String!
+  nombrePlantilla: String!
+  plantillaUrl: String!
+  activo: Boolean!
+  fechaCreacion: String!
+  fechaActualizacion: String
+  tipoDocumento: TipoDocumentoInfo
+}
+
+type PlantillaDocumentoConnection {
+  plantillasDocumento: [PlantillaDocumento!]!
+  totalCount: Int!
+}
+
+input PlantillaDocumentoInput {
+  tipoDocumentoId: String!
+  nombrePlantilla: String!
+  plantillaUrl: String!
+  activo: Boolean!
+}
+
+input PlantillaDocumentoFiltros {
+  tipoDocumentoId: String
+  nombrePlantilla: String
+  codigo: String
+  activo: Boolean
+  busqueda: String
+  tipoDocumento: String
+}
+
+type Query {
+  obtenerPlantillaDocumento(id: ID!): PlantillaDocumento
+  listarPlantillasDocumento(limit: Int, offset: Int, filters: PlantillaDocumentoFiltros): PlantillaDocumentoConnection!
+  findActivasPlantillaDocumento: [PlantillaDocumento!]!
+  findInactivasPlantillaDocumento: [PlantillaDocumento!]!
+  obtenerPlantillasPorTipoDocumento(tipoDocumentoId: String!): [PlantillaDocumento!]!
+  obtenerPlantillaActivaPorTipoDocumento(tipoDocumentoId: String!): PlantillaDocumento
+}
+
+type Mutation {
+  crearPlantillaDocumento(input: PlantillaDocumentoInput!): PlantillaDocumento!
+  actualizarPlantillaDocumento(id: ID!, input: PlantillaDocumentoInput!): PlantillaDocumento!
+  eliminarPlantillaDocumento(id: ID!): Boolean!
+}

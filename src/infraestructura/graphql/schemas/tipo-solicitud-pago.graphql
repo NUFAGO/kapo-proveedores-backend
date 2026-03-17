@@ -1,0 +1,45 @@
+type TipoSolicitudPago {
+  id: ID!
+  codigo: String!
+  nombre: String!
+  descripcion: String
+  categoria: String!
+  permiteMultiple: Boolean!
+  permiteVincularReportes: Boolean!
+  estado: String!
+  fechaCreacion: String!
+  fechaActualizacion: String
+}
+
+type TipoSolicitudPagoConnection {
+  tiposSolicitudPago: [TipoSolicitudPago!]!
+  totalCount: Int!
+}
+
+input TipoSolicitudPagoInput {
+  nombre: String!
+  descripcion: String
+  categoria: String!
+  permiteMultiple: Boolean!
+  permiteVincularReportes: Boolean!
+  estado: String!
+}
+
+input TipoSolicitudPagoFiltros {
+  nombre: String
+  categoria: String
+  estado: String
+}
+
+type Query {
+  obtenerTipoSolicitudPago(id: ID!): TipoSolicitudPago
+  listarTiposSolicitudPago(limit: Int, offset: Int, filters: TipoSolicitudPagoFiltros): TipoSolicitudPagoConnection!
+  findActivosSolicitudPago: [TipoSolicitudPago!]!
+  findInactivosSolicitudPago: [TipoSolicitudPago!]!
+}
+
+type Mutation {
+  crearTipoSolicitudPago(input: TipoSolicitudPagoInput!): TipoSolicitudPago!
+  actualizarTipoSolicitudPago(id: ID!, input: TipoSolicitudPagoInput!): TipoSolicitudPago!
+  eliminarTipoSolicitudPago(id: ID!): Boolean!
+}

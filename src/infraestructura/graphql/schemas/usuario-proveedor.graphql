@@ -1,0 +1,71 @@
+# ============================================================================
+# SCHEMA GraphQL PARA USUARIOS PROVEEDOR
+# ============================================================================
+
+type UsuarioProveedor {
+  id: ID!
+  nombres: String!
+  apellido_paterno: String!
+  apellido_materno: String!
+  dni: String!
+  username: String!
+  proveedor_id: String!
+  proveedor_nombre: String!
+  estado: UsuarioProveedorEstado!
+  fecha_creacion: String!
+  fecha_actualizacion: String!
+}
+
+enum UsuarioProveedorEstado {
+  ACTIVO
+  PENDIENTE
+  BLOQUEADO
+  INACTIVO
+}
+
+input UsuarioProveedorInput {
+  nombres: String!
+  apellido_paterno: String!
+  apellido_materno: String!
+  dni: String!
+  username: String!
+  password: String!
+  proveedor_id: String!
+  proveedor_nombre: String!
+  estado: UsuarioProveedorEstado
+}
+
+input UsuarioProveedorUpdateInput {
+  nombres: String
+  apellido_paterno: String
+  apellido_materno: String
+  dni: String
+  username: String
+  password: String
+  proveedor_id: String
+  proveedor_nombre: String
+  estado: UsuarioProveedorEstado
+}
+
+# ============================================================================
+# QUERIES
+# ============================================================================
+
+extend type Query {
+  usuariosProveedor: [UsuarioProveedor!]!
+  usuarioProveedor(id: ID!): UsuarioProveedor
+  usuarioProveedorByDni(dni: String!): UsuarioProveedor
+  usuarioProveedorByUsername(username: String!): UsuarioProveedor
+  usuariosProveedorByProveedorId(proveedor_id: String!): [UsuarioProveedor!]!
+}
+
+# ============================================================================
+# MUTATIONS
+# ============================================================================
+
+extend type Mutation {
+  createUsuarioProveedor(data: UsuarioProveedorInput!): UsuarioProveedor!
+  updateUsuarioProveedor(id: ID!, data: UsuarioProveedorUpdateInput!): UsuarioProveedor!
+  deleteUsuarioProveedor(id: ID!): UsuarioProveedor!
+  cambiarEstadoUsuarioProveedor(id: ID!, estado: UsuarioProveedorEstado!): UsuarioProveedor!
+}

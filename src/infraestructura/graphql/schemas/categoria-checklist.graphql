@@ -1,0 +1,60 @@
+type CategoriaChecklist {
+  id: ID!
+  nombre: String!
+  descripcion: String
+  tipoUso: String!
+  permiteMultiple: Boolean
+  permiteVincularReportes: Boolean
+  estado: String!
+  fechaCreacion: DateTime!
+  fechaActualizacion: DateTime
+}
+
+type CategoriaChecklistConnection {
+  categoriasChecklist: [CategoriaChecklist!]!
+  totalCount: Int!
+}
+
+input CategoriaChecklistInput {
+  nombre: String!
+  descripcion: String
+  tipoUso: String!
+  permiteMultiple: Boolean
+  permiteVincularReportes: Boolean
+  estado: String!
+}
+
+input CategoriaChecklistFiltros {
+  nombre: String
+  tipoUso: String
+  estado: String
+}
+
+type Query {
+  # Obtener una categoría de checklist por ID
+  obtenerCategoriaChecklist(id: ID!): CategoriaChecklist
+
+  # Listar categorías de checklist con filtros y paginación
+  listarCategoriasChecklist(
+    limit: Int
+    offset: Int
+    filters: CategoriaChecklistFiltros
+  ): CategoriaChecklistConnection
+
+  # Obtener solo categorías de checklist activas
+  findActivasCategoriaChecklist: [CategoriaChecklist!]!
+
+  # Obtener solo categorías de checklist inactivas
+  findInactivasCategoriaChecklist: [CategoriaChecklist!]!
+}
+
+type Mutation {
+  # Solo admin puede crear categorías de checklist
+  crearCategoriaChecklist(input: CategoriaChecklistInput!): CategoriaChecklist!
+
+  # Solo admin puede actualizar categorías de checklist
+  actualizarCategoriaChecklist(id: ID!, input: CategoriaChecklistInput!): CategoriaChecklist!
+
+  # Solo admin puede eliminar categorías de checklist
+  eliminarCategoriaChecklist(id: ID!): Boolean!
+}

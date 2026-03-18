@@ -1,0 +1,148 @@
+# Tipos base
+scalar JSON
+
+# Entidades principales (importadas desde otros schemas)
+# CategoriaChecklist - definido en categoria-checklist.graphql
+# PlantillaDocumento - definido en plantilla-documento.graphql
+
+type PlantillaFormulario {
+  id: ID!
+  nombre: String!
+  version: Int!
+  activo: Boolean!
+  descripcion: String
+  baseId: String!
+  campos: JSON!
+}
+
+# Entidades principales
+type RequisitoDocumento {
+  id: ID!
+  checklistId: String!
+  tipoRequisito: String!
+  plantillaDocumentoId: String
+  formularioId: String
+  obligatorio: Boolean!
+  orden: Int!
+  plantillaDocumento: PlantillaDocumento
+  formulario: PlantillaFormulario
+}
+
+type PlantillaChecklist {
+  id: ID!
+  codigo: String!
+  nombre: String!
+  descripcion: String
+  categoriaChecklistId: String!
+  categoria: CategoriaChecklist
+  version: Int!
+  plantillaBaseId: String!
+  vigente: Boolean!
+  activo: Boolean!
+  fechaCreacion: DateTime!
+  fechaActualizacion: DateTime
+  requisitos: [RequisitoDocumento]
+}
+
+# Tipos de conexión para paginación
+type PlantillaChecklistConnection {
+  plantillasChecklist: [PlantillaChecklist]!
+  totalCount: Int!
+}
+
+# Inputs para filtros
+input PlantillaChecklistFiltros {
+  codigo: String
+  nombre: String
+  categoriaChecklistId: String
+  activo: Boolean
+  vigente: Boolean
+  categoriaTipoUso: String
+}
+
+input RequisitoDocumentoFiltros {
+  checklistId: String
+  tipoRequisito: String
+  obligatorio: Boolean
+  plantillaDocumentoId: String
+  formularioId: String
+}
+
+# Inputs para creación/actualización
+input PlantillaChecklistInput {
+  codigo: String
+  nombre: String!
+  descripcion: String
+  categoriaChecklistId: String!
+  version: Int
+  plantillaBaseId: String
+  vigente: Boolean
+  activo: Boolean!
+}
+
+input RequisitoDocumentoInput {
+  checklistId: String!
+  tipoRequisito: String!
+  plantillaDocumentoId: String
+  formularioId: String
+  obligatorio: Boolean!
+  orden: Int!
+}
+
+# Query principal
+type Query {
+  # PlantillasChecklist
+  listarPlantillasChecklist(
+    filtros: PlantillaChecklistFiltros
+    limit: Int = 20
+    offset: Int = 0
+  ): PlantillaChecklistConnection!
+  
+  listarPlantillasChecklistConRequisitos(
+    filtros: PlantillaChecklistFiltros
+    limit: Int = 20
+    offset: Int = 0
+  ): PlantillaChecklistConnection!
+  
+  obtenerPlantillaChecklist(id: ID!): PlantillaChecklist
+  obtenerPlantillaChecklistConRequisitos(id: ID!): PlantillaChecklist
+  
+  findActivasPlantillaChecklist: [PlantillaChecklist]!
+  findInactivasPlantillaChecklist: [PlantillaChecklist]!
+  findVigentesPlantillaChecklist: [PlantillaChecklist]!
+  findPlantillasPorCategoria(categoriaChecklistId: String!): [PlantillaChecklist]!
+  
+  # Queries de versionamiento
+  obtenerVersionesPorCodigo(codigo: String!): [PlantillaChecklist]!
+  obtenerVersionVigentePorCodigo(codigo: String!): PlantillaChecklist
+  
+  # RequisitosDocumento
+  listarRequisitosPorChecklist(checklistId: String!): [RequisitoDocumento]!
+  listarRequisitosPorChecklistConRelaciones(checklistId: String!): [RequisitoDocumento]!
+  obtenerRequisitoDocumento(id: ID!): RequisitoDocumento
+  listarRequisitosConFiltros(filtros: RequisitoDocumentoFiltros): [RequisitoDocumento]!
+}
+
+# Mutations
+type Mutation {
+  # PlantillasChecklist
+  crearPlantillaChecklist(input: PlantillaChecklistInput!): PlantillaChecklist!
+  actualizarPlantillaChecklist(id: ID!, input: PlantillaChecklistInput!): PlantillaChecklist!
+  eliminarPlantillaChecklist(id: ID!): Boolean!
+  duplicarPlantillaChecklist(id: ID!, nuevoNombre: String!): PlantillaChecklist!
+  crearNuevaVersion(checklistId: ID!): PlantillaChecklist!
+  
+  # RequisitosDocumento
+  crearRequisitoDocumento(input: RequisitoDocumentoInput!): RequisitoDocumento!
+  actualizarRequisitoDocumento(id: ID!, input: RequisitoDocumentoInput!): RequisitoDocumento!
+  eliminarRequisitoDocumento(id: ID!): Boolean!
+  reordenarRequisitos(checklistId: String!, requisitos: [RequisitoOrdenInput]!): Boolean!
+  crearMultiplesRequisitos(requisitos: [RequisitoDocumentoInput!]!): [RequisitoDocumento]!
+  eliminarRequisitosPorChecklist(checklistId: String!): Boolean!
+}
+
+# Input para reordenamiento
+input RequisitoOrdenInput {
+  id: ID!
+  orden: Int!
+}

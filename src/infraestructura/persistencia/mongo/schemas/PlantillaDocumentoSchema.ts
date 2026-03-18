@@ -7,6 +7,7 @@ export interface PlantillaDocumentoDocument {
   tipoDocumentoId: string;
   nombrePlantilla: string;
   plantillaUrl: string;
+  formatosPermitidos?: string;
   activo: boolean;
   fechaCreacion: Date;
   fechaActualizacion?: Date;
@@ -37,6 +38,22 @@ const PlantillaDocumentoSchema = new Schema<PlantillaDocumentoDocument>({
     required: true, 
     trim: true,
     maxlength: 1000
+  },
+  formatosPermitidos: {
+    type: String,
+    trim: true,
+    maxlength: 100,
+    default: null,
+    validate: {
+      validator: function(v: string) {
+        if (!v) return true; // Es opcional
+        // Validar formato: "pdf,doc,docx" separados por comas
+        const formatos = v.split(',').map(f => f.trim().toLowerCase());
+        const formatosValidos = ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'txt', 'jpg', 'jpeg', 'png'];
+        return formatos.every(f => formatosValidos.includes(f));
+      },
+      message: 'Formatos no válidos. Use: pdf,doc,docx,xls,xlsx,ppt,pptx,txt,jpg,jpeg,png separados por comas'
+    }
   },
   activo: { 
     type: Boolean, 

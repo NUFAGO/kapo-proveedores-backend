@@ -11,9 +11,10 @@ type PlantillaDocumento {
   tipoDocumentoId: String!
   nombrePlantilla: String!
   plantillaUrl: String!
+  formatosPermitidos: String
   activo: Boolean!
-  fechaCreacion: String!
-  fechaActualizacion: String
+  fechaCreacion: DateTime!
+  fechaActualizacion: DateTime
   tipoDocumento: TipoDocumentoInfo
 }
 
@@ -26,6 +27,7 @@ input PlantillaDocumentoInput {
   tipoDocumentoId: String!
   nombrePlantilla: String!
   plantillaUrl: String!
+  formatosPermitidos: String
   activo: Boolean!
 }
 

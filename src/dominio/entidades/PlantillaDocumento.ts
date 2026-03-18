@@ -4,6 +4,7 @@ export interface PlantillaDocumento {
   tipoDocumentoId: string
   nombrePlantilla: string
   plantillaUrl: string
+  formatosPermitidos?: string
   activo: boolean
   fechaCreacion: string
   fechaActualizacion?: string
@@ -19,6 +20,7 @@ export interface PlantillaDocumentoInput {
   tipoDocumentoId: string
   nombrePlantilla: string
   plantillaUrl: string
+  formatosPermitidos?: string
   activo: boolean
 }
 

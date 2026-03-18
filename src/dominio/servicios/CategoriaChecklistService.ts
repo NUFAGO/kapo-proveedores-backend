@@ -79,5 +79,4 @@ export class CategoriaChecklistService {
       throw new Error('Tipo de uso no válido');
     }
   }
-
 }

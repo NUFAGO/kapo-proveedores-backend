@@ -15,6 +15,7 @@ export class PlantillaDocumentoMongoRepository extends BaseMongoRepository<Plant
       tipoDocumentoId: doc.tipoDocumentoId,
       nombrePlantilla: doc.nombrePlantilla,
       plantillaUrl: doc.plantillaUrl,
+      formatosPermitidos: doc.formatosPermitidos || null,
       activo: doc.activo,
       fechaCreacion: doc.fechaCreacion.toISOString(),
       fechaActualizacion: doc.fechaActualizacion?.toISOString()
@@ -29,6 +30,7 @@ export class PlantillaDocumentoMongoRepository extends BaseMongoRepository<Plant
       tipoDocumentoId: input.tipoDocumentoId.trim(),
       nombrePlantilla: input.nombrePlantilla.trim(),
       plantillaUrl: input.plantillaUrl.trim(),
+      formatosPermitidos: input.formatosPermitidos?.trim() || null,
       activo: input.activo
     });
 
@@ -53,6 +55,7 @@ export class PlantillaDocumentoMongoRepository extends BaseMongoRepository<Plant
       if (input.tipoDocumentoId !== undefined) updateData.tipoDocumentoId = input.tipoDocumentoId.trim();
       if (input.nombrePlantilla !== undefined) updateData.nombrePlantilla = input.nombrePlantilla.trim();
       if (input.plantillaUrl !== undefined) updateData.plantillaUrl = input.plantillaUrl.trim();
+      if (input.formatosPermitidos !== undefined) updateData.formatosPermitidos = input.formatosPermitidos?.trim() || null;
       if (input.activo !== undefined) updateData.activo = input.activo;
 
       const doc = await PlantillaDocumentoModel.findByIdAndUpdate(

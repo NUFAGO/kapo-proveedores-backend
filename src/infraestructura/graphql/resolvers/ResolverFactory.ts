@@ -8,8 +8,9 @@ import { AuthAdminResolver } from './AuthAdminResolver';
 import { AuthProveedorResolver } from './AuthProveedorResolver';
 import { UsuarioProveedorResolver } from './UsuarioProveedorResolver';
 import { TipoDocumentoResolver } from './TipoDocumentoResolver';
-import { TipoSolicitudPagoResolver } from './TipoSolicitudPagoResolver';
+import { CategoriaChecklistResolver } from './CategoriaChecklistResolver';
 import { PlantillaDocumentoResolver } from './PlantillaDocumentoResolver';
+import { PlantillaChecklistResolver } from './PlantillaChecklistResolver';
 import { UploadResolver } from './UploadResolver';
 import { Container } from '../../di/Container';
 import { AuthService } from '../../../aplicacion/servicios/AuthService';
@@ -17,12 +18,16 @@ import { AuthAdminService } from '../../../aplicacion/servicios/AuthAdminService
 import { AuthProveedorService } from '../../../aplicacion/servicios/AuthProveedorService';
 import { UsuarioProveedorService } from '../../../aplicacion/servicios/UsuarioProveedorService';
 import { TipoDocumentoService } from '../../../aplicacion/servicios/TipoDocumentoService';
-import { TipoSolicitudPagoService } from '../../../dominio/servicios/TipoSolicitudPagoService';
+import { CategoriaChecklistService } from '../../../dominio/servicios/CategoriaChecklistService';
 import { PlantillaDocumentoService } from '../../../dominio/servicios/PlantillaDocumentoService';
+import { PlantillaChecklistService } from '../../../dominio/servicios/PlantillaChecklistService';
+import { RequisitoDocumentoService } from '../../../dominio/servicios/RequisitoDocumentoService';
 import { UsuarioProveedorMongoRepository } from '../../persistencia/mongo/UsuarioProveedorMongoRepository';
 import { TipoDocumentoMongoRepository } from '../../persistencia/mongo/TipoDocumentoMongoRepository';
-import { TipoSolicitudPagoMongoRepository } from '../../persistencia/mongo/TipoSolicitudPagoMongoRepository';
+import { CategoriaChecklistMongoRepository } from '../../persistencia/mongo/CategoriaChecklistMongoRepository';
 import { PlantillaDocumentoMongoRepository } from '../../persistencia/mongo/PlantillaDocumentoMongoRepository';
+import { PlantillaChecklistMongoRepository } from '../../persistencia/mongo/PlantillaChecklistMongoRepository';
+import { RequisitoDocumentoMongoRepository } from '../../persistencia/mongo/RequisitoDocumentoMongoRepository';
 import { HttpAuthRepository } from '../../persistencia/http/HttpAuthRepository';
 // import { DynamicGuardSystem } from '../../auth/DynamicGuardSystem'; // Temporalmente desactivado
 import { logger } from '../../logging/Logger';
@@ -63,11 +68,17 @@ export class ResolverFactory {
     // Registrar TipoDocumentoMongoRepository
     container.register('TipoDocumentoMongoRepository', () => new TipoDocumentoMongoRepository(), true);
     
-    // Registrar TipoSolicitudPagoMongoRepository
-    container.register('TipoSolicitudPagoMongoRepository', () => new TipoSolicitudPagoMongoRepository(), true);
+    // Registrar CategoriaChecklistMongoRepository
+    container.register('CategoriaChecklistMongoRepository', () => new CategoriaChecklistMongoRepository(), true);
     
     // Registrar PlantillaDocumentoMongoRepository
     container.register('PlantillaDocumentoMongoRepository', () => new PlantillaDocumentoMongoRepository(), true);
+    
+    // Registrar PlantillaChecklistMongoRepository
+    container.register('PlantillaChecklistMongoRepository', () => new PlantillaChecklistMongoRepository(), true);
+    
+    // Registrar RequisitoDocumentoMongoRepository
+    container.register('RequisitoDocumentoMongoRepository', () => new RequisitoDocumentoMongoRepository(), true);
     
     // Registrar AuthService (usa HttpAuthRepository)
     container.register('AuthService', (c: any) => {
@@ -99,16 +110,30 @@ export class ResolverFactory {
       return new TipoDocumentoService(tipoDocumentoRepo);
     }, true);
     
-    // Registrar TipoSolicitudPagoService (usa TipoSolicitudPagoMongoRepository)
-    container.register('TipoSolicitudPagoService', (c: any) => {
-      const tipoSolicitudPagoRepo = c.resolve('TipoSolicitudPagoMongoRepository');
-      return new TipoSolicitudPagoService(tipoSolicitudPagoRepo);
+    // Registrar CategoriaChecklistService (usa CategoriaChecklistMongoRepository)
+    container.register('CategoriaChecklistService', (c: any) => {
+      const categoriaChecklistRepo = c.resolve('CategoriaChecklistMongoRepository');
+      return new CategoriaChecklistService(categoriaChecklistRepo);
     }, true);
     
     // Registrar PlantillaDocumentoService (usa PlantillaDocumentoMongoRepository)
     container.register('PlantillaDocumentoService', (c: any) => {
       const plantillaDocumentoRepo = c.resolve('PlantillaDocumentoMongoRepository');
       return new PlantillaDocumentoService(plantillaDocumentoRepo);
+    }, true);
+    
+    // Registrar PlantillaChecklistService (usa PlantillaChecklistMongoRepository y CategoriaChecklistService)
+    container.register('PlantillaChecklistService', (c: any) => {
+      const plantillaRepo = c.resolve('PlantillaChecklistMongoRepository');
+      const categoriaService = c.resolve('CategoriaChecklistService');
+      return new PlantillaChecklistService(plantillaRepo, categoriaService);
+    }, true);
+    
+    // Registrar RequisitoDocumentoService (usa RequisitoDocumentoMongoRepository y PlantillaDocumentoService)
+    container.register('RequisitoDocumentoService', (c: any) => {
+      const requisitoRepo = c.resolve('RequisitoDocumentoMongoRepository');
+      const plantillaDocumentoService = c.resolve('PlantillaDocumentoService');
+      return new RequisitoDocumentoService(requisitoRepo, plantillaDocumentoService);
     }, true);
     
     // Registrar AuthResolver
@@ -141,10 +166,10 @@ export class ResolverFactory {
       return new TipoDocumentoResolver(tipoDocumentoService);
     }, true);
     
-    // Registrar TipoSolicitudPagoResolver
-    container.register('TipoSolicitudPagoResolver', (c: any) => {
-      const tipoSolicitudPagoService = c.resolve('TipoSolicitudPagoService');
-      return new TipoSolicitudPagoResolver(tipoSolicitudPagoService);
+    // Registrar CategoriaChecklistResolver
+    container.register('CategoriaChecklistResolver', (c: any) => {
+      const categoriaChecklistService = c.resolve('CategoriaChecklistService');
+      return new CategoriaChecklistResolver(categoriaChecklistService);
     }, true);
     
     // Registrar PlantillaDocumentoResolver
@@ -153,10 +178,17 @@ export class ResolverFactory {
       return new PlantillaDocumentoResolver(plantillaDocumentoService);
     }, true);
     
+    // Registrar PlantillaChecklistResolver
+    container.register('PlantillaChecklistResolver', (c: any) => {
+      const plantillaService = c.resolve('PlantillaChecklistService');
+      const requisitoService = c.resolve('RequisitoDocumentoService');
+      return new PlantillaChecklistResolver(plantillaService, requisitoService);
+    }, true);
+    
     // Registrar UploadResolver
     container.register('UploadResolver', () => new UploadResolver(), true);
     
-    logger.info('Container inicializado con dependencias de autenticación, usuarios proveedor, tipos de documento, plantillas de documento y upload');
+    logger.info('Container inicializado con dependencias de autenticación, usuarios proveedor, tipos de documento, categorias checklist, plantillas de documento y upload');
   }
 
   /**
@@ -193,15 +225,20 @@ export class ResolverFactory {
       resolvers.push(tipoDocumentoResolver.getResolvers());
       logger.debug('Resolver configurado: tipoDocumento');
       
-      // Crear TipoSolicitudPagoResolver
-      const tipoSolicitudPagoResolver = container.resolve<TipoSolicitudPagoResolver>('TipoSolicitudPagoResolver');
-      resolvers.push(tipoSolicitudPagoResolver.getResolvers());
-      logger.debug('Resolver configurado: tipoSolicitudPago');
+      // Crear CategoriaChecklistResolver
+      const categoriaChecklistResolver = container.resolve<CategoriaChecklistResolver>('CategoriaChecklistResolver');
+      resolvers.push(categoriaChecklistResolver.getResolvers());
+      logger.debug('Resolver configurado: categoriaChecklist');
       
       // Crear PlantillaDocumentoResolver
       const plantillaDocumentoResolver = container.resolve<PlantillaDocumentoResolver>('PlantillaDocumentoResolver');
       resolvers.push(plantillaDocumentoResolver.getResolvers());
       logger.debug('Resolver configurado: plantillaDocumento');
+      
+      // Crear PlantillaChecklistResolver
+      const plantillaChecklistResolver = container.resolve<PlantillaChecklistResolver>('PlantillaChecklistResolver');
+      resolvers.push(plantillaChecklistResolver.getResolvers());
+      logger.debug('Resolver configurado: plantillaChecklist');
       
       // Crear UploadResolver
       const uploadResolver = container.resolve<UploadResolver>('UploadResolver');

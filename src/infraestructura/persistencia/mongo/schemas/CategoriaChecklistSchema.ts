@@ -1,27 +1,19 @@
 import { Schema, model } from 'mongoose';
 
 // Interface para el documento de MongoDB
-export interface TipoSolicitudPagoDocument {
+export interface CategoriaChecklistDocument {
   _id: string;
-  codigo: string;
   nombre: string;
   descripcion?: string;
-  categoria: 'anticipado' | 'avance' | 'cierre' | 'entrega' | 'gasto' | 'ajuste';
-  permiteMultiple: boolean;
-  permiteVincularReportes: boolean;
+  tipoUso: 'pago' | 'documentos_oc';
+  permiteMultiple?: boolean; // Solo aplica si tipoUso es 'pago'
+  permiteVincularReportes?: boolean; // Solo aplica si tipoUso es 'pago'
   estado: 'activo' | 'inactivo';
   fechaCreacion: Date;
   fechaActualizacion?: Date;
 }
 
-const TipoSolicitudPagoSchema = new Schema<TipoSolicitudPagoDocument>({
-  codigo: { 
-    type: String, 
-    required: true, 
-    unique: true,
-    uppercase: true,
-    trim: true
-  },
+const CategoriaChecklistSchema = new Schema<CategoriaChecklistDocument>({
   nombre: { 
     type: String, 
     required: true, 
@@ -34,20 +26,20 @@ const TipoSolicitudPagoSchema = new Schema<TipoSolicitudPagoDocument>({
     trim: true,
     maxlength: 500
   },
-  categoria: { 
+  tipoUso: { 
     type: String, 
     required: true, 
-    enum: ['anticipado', 'avance', 'cierre', 'entrega', 'gasto', 'ajuste'],
-    default: 'avance'
+    enum: ['pago', 'documentos_oc'],
+    default: 'pago'
   },
   permiteMultiple: { 
     type: Boolean, 
-    required: true, 
+    required: false, // Opcional, solo aplica si tipoUso es 'pago'
     default: false 
   },
   permiteVincularReportes: { 
     type: Boolean, 
-    required: true, 
+    required: false, // Opcional, solo aplica si tipoUso es 'pago'
     default: false 
   },
   estado: { 
@@ -70,7 +62,7 @@ const TipoSolicitudPagoSchema = new Schema<TipoSolicitudPagoDocument>({
 });
 
 // Middleware para actualizar fechaActualizacion antes de guardar
-TipoSolicitudPagoSchema.pre('save', function(next) {
+CategoriaChecklistSchema.pre('save', function(next) {
   if (this.isModified() && !this.isNew) {
     this.fechaActualizacion = new Date();
   }
@@ -78,14 +70,14 @@ TipoSolicitudPagoSchema.pre('save', function(next) {
 });
 
 // Middleware para actualizar fechaActualizacion antes de updateOne
-TipoSolicitudPagoSchema.pre(['updateOne', 'updateMany', 'findOneAndUpdate'], function(next) {
+CategoriaChecklistSchema.pre(['updateOne', 'updateMany', 'findOneAndUpdate'], function(next) {
   this.set({ fechaActualizacion: new Date() });
   next();
 });
 
 // Índices
-TipoSolicitudPagoSchema.index({ estado: 1 });
-TipoSolicitudPagoSchema.index({ categoria: 1 });
-TipoSolicitudPagoSchema.index({ estado: 1, categoria: 1 });
+CategoriaChecklistSchema.index({ estado: 1 });
+CategoriaChecklistSchema.index({ tipoUso: 1 });
+CategoriaChecklistSchema.index({ estado: 1, tipoUso: 1 });
 
-export const TipoSolicitudPagoModel = model<TipoSolicitudPagoDocument>('TipoSolicitudPago', TipoSolicitudPagoSchema);
+export const CategoriaChecklistModel = model<CategoriaChecklistDocument>('CategoriaChecklist', CategoriaChecklistSchema);

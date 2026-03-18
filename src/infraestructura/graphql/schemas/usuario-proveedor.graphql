@@ -12,8 +12,8 @@ type UsuarioProveedor {
   proveedor_id: String!
   proveedor_nombre: String!
   estado: UsuarioProveedorEstado!
-  fecha_creacion: String!
-  fecha_actualizacion: String!
+  fecha_creacion: DateTime!
+  fecha_actualizacion: DateTime!
 }
 
 enum UsuarioProveedorEstado {

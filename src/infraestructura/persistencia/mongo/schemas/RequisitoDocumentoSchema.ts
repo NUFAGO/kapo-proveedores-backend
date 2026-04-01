@@ -7,6 +7,8 @@ export interface IRequisitoDocumentoDocument extends Document {
   formularioId?: string
   obligatorio: boolean
   orden: number
+  activo: boolean
+  __v: number
 }
 
 const RequisitoDocumentoSchema = new Schema<IRequisitoDocumentoDocument>({
@@ -59,10 +61,16 @@ const RequisitoDocumentoSchema = new Schema<IRequisitoDocumentoDocument>({
     type: Number,
     required: true,
     min: 1
+  },
+  activo: {
+    type: Boolean,
+    required: true,
+    default: true
   }
 }, {
   timestamps: true,
-  collection: 'requisitos_documento'
+  collection: 'requisitos_documento',
+  versionKey: '__v'
 })
 
 // Índices para optimizar consultas
@@ -71,6 +79,8 @@ RequisitoDocumentoSchema.index({ checklistId: 1, tipoRequisito: 1 })
 RequisitoDocumentoSchema.index({ plantillaDocumentoId: 1 })
 RequisitoDocumentoSchema.index({ formularioId: 1 })
 RequisitoDocumentoSchema.index({ obligatorio: 1 })
+RequisitoDocumentoSchema.index({ activo: 1 })
+RequisitoDocumentoSchema.index({ checklistId: 1, activo: 1 })
 
 export const RequisitoDocumentoModel = model<IRequisitoDocumentoDocument>('RequisitoDocumento', RequisitoDocumentoSchema)
 export default RequisitoDocumentoModel

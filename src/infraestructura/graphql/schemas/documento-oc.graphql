@@ -1,0 +1,188 @@
+# Tipos de entrada para DocumentoOC
+input DocumentoOCInput {
+  expedienteId: String!
+  checklistId: String!
+  obligatorio: Boolean!
+}
+
+# Enum para estados de DocumentoOC
+enum DocumentoOC_Estado {
+  PENDIENTE
+  CARGADO
+  OBSERVADO
+  APROBADO
+  RECHAZADO
+}
+
+input DocumentoOCFilter {
+  expedienteId: String
+  checklistId: String
+  estado: String
+  obligatorio: Boolean
+}
+
+input UpdateDocumentoOCInput {
+  expedienteId: String
+  checklistId: String
+  obligatorio: Boolean
+}
+
+# Tipos de entrada para archivos
+input ArchivoInput {
+  url: String!
+  nombreOriginal: String!
+  mimeType: String!
+  tamanioBytes: Int!
+  fechaSubida: DateTime!
+}
+
+input SubirArchivosInput {
+  id: String!
+  archivos: [ArchivoInput!]!
+  usuarioId: String!
+}
+
+# Tipos de entrada para DocumentoSubido
+input DocumentoSubidoInput {
+  documentoOCId: String
+  solicitudPagoId: String
+  requisitoDocumentoId: String
+  usuarioId: String!
+  archivos: [ArchivoInput!]!
+}
+
+# Enum para estados de DocumentoSubido
+enum DocumentoSubido_Estado {
+  PENDIENTE
+  APROBADO
+  OBSERVADO
+  RECHAZADO
+}
+
+input DocumentoSubidoFilter {
+  documentoOCId: String
+  solicitudPagoId: String
+  requisitoDocumentoId: String
+  usuarioId: String
+  estado: String
+}
+
+# Tipos de entrada para aprobación/observación
+input AprobarDocumentoInput {
+  id: String!
+}
+
+input ObservarDocumentoInput {
+  id: String!
+  comentarios: String!
+}
+
+# Tipo Archivo
+type Archivo {
+  url: String!
+  nombreOriginal: String!
+  mimeType: String!
+  tamanioBytes: Int!
+  fechaSubida: DateTime!
+}
+
+# Tipo principal DocumentoSubido
+type DocumentoSubido {
+  id: ID!
+  documentoOCId: String
+  solicitudPagoId: String
+  requisitoDocumentoId: String
+  usuario: UsuarioProveedor
+  archivos: [Archivo!]!
+  version: Int!
+  estado: DocumentoSubido_Estado!
+  fechaSubida: DateTime!
+  fechaRevision: DateTime
+  comentariosRevision: String
+}
+
+# Tipo principal DocumentoOC
+type DocumentoOC {
+  id: ID!
+  expedienteId: String!
+  checklistId: String!
+  obligatorio: Boolean!
+  estado: DocumentoOC_Estado!
+  fechaCarga: DateTime
+  
+  # Relaciones 
+  expediente: ExpedientePago
+  checklist: PlantillaChecklist
+}
+
+# Queries para DocumentoOC
+extend type Query {
+  # Obtener un documento OC por ID
+  obtenerDocumentoOC(id: ID!): DocumentoOC
+  
+  # Listar documentos OC con filtros
+  listarDocumentosOC(filter: DocumentoOCFilter): [DocumentoOC!]!
+  
+  # Obtener documentos por expediente
+  obtenerDocumentosPorExpediente(expedienteId: String!): [DocumentoOC!]!
+  
+  # Verificar si todos los documentos obligatorios están aprobados
+  verificarDocumentosObligatoriosAprobados(expedienteId: String!): Boolean!
+  
+  # Obtener documentos obligatorios pendientes
+  obtenerDocumentosObligatoriosPendientes(expedienteId: String!): [DocumentoOC!]!
+}
+
+# Mutations para DocumentoOC
+extend type Mutation {
+  # Crear un nuevo documento OC
+  crearDocumentoOC(input: DocumentoOCInput!): DocumentoOC
+  
+  # Subir archivos a un documento OC (crea DocumentoSubido)
+  subirArchivosDocumento(input: DocumentoSubidoInput!): DocumentoSubido
+  
+  # Aprobar un documento OC
+  aprobarDocumentoOC(input: AprobarDocumentoInput!): DocumentoOC
+  
+  # Observar un documento OC
+  observarDocumentoOC(input: ObservarDocumentoInput!): DocumentoOC
+  
+  # Actualizar un documento OC
+  actualizarDocumentoOC(id: ID!, input: UpdateDocumentoOCInput!): DocumentoOC
+  
+  # Eliminar un documento OC
+  eliminarDocumentoOC(id: ID!): Boolean
+}
+
+# Queries para DocumentoSubido
+extend type Query {
+  # Obtener un documento subido por ID
+  obtenerDocumentoSubido(id: ID!): DocumentoSubido
+  
+  # Listar documentos subidos con filtros
+  listarDocumentosSubidos(filter: DocumentoSubidoFilter): [DocumentoSubido!]!
+  
+  # Obtener documentos subidos por documento OC
+  obtenerDocumentosSubidosPorDocumentoOC(documentoOCId: String!): [DocumentoSubido!]!
+  
+  # Obtener documentos subidos por solicitud de pago
+  obtenerDocumentosSubidosPorSolicitudPago(solicitudPagoId: String!): [DocumentoSubido!]!
+}
+
+# Mutations para DocumentoSubido
+extend type Mutation {
+  # Crear un nuevo documento subido
+  crearDocumentoSubido(input: DocumentoSubidoInput!): DocumentoSubido
+  
+  # Aprobar un documento subido
+  aprobarDocumentoSubido(id: ID!): DocumentoSubido
+  
+  # Observar un documento subido
+  observarDocumentoSubido(id: ID!, comentarios: String!): DocumentoSubido
+  
+  # Rechazar un documento subido
+  rechazarDocumentoSubido(id: ID!, comentarios: String!): DocumentoSubido
+  
+  # Eliminar un documento subido
+  eliminarDocumentoSubido(id: ID!): Boolean
+}

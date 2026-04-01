@@ -146,6 +146,16 @@ export class RequisitoDocumentoService {
     return await this.requisitoRepository.eliminarPorChecklist(checklistId)
   }
 
+  async toggleActivo(id: string): Promise<RequisitoDocumento | null> {
+    const existente = await this.requisitoRepository.obtenerPorId(id)
+    if (!existente) {
+      throw new Error('El requisito de documento no existe')
+    }
+
+    const nuevoEstado = !existente.activo
+    return await this.requisitoRepository.actualizar(id, { activo: nuevoEstado })
+  }
+
   private async validarRequisitoInput(input: RequisitoDocumentoInput): Promise<void> {
     if (input.tipoRequisito === 'documento') {
       if (!input.plantillaDocumentoId) {

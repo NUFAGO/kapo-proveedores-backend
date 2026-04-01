@@ -1,0 +1,88 @@
+# Tipos de entrada para TipoPagoOC
+input TipoPagoOCInput {
+  expedienteId: String!
+  categoriaChecklistId: String!
+  checklistId: String!
+  modoRestriccion: String!
+  orden: Int
+  requiereAnteriorPagado: Boolean
+  porcentajeMaximo: Float
+  porcentajeMinimo: Float
+}
+
+input TipoPagoOCFilter {
+  expedienteId: String
+  categoriaChecklistId: String
+  checklistId: String
+  modoRestriccion: String
+}
+
+input UpdateTipoPagoOCInput {
+  expedienteId: String
+  categoriaChecklistId: String
+  checklistId: String
+  modoRestriccion: String
+  orden: Int
+  requiereAnteriorPagado: Boolean
+  porcentajeMaximo: Float
+  porcentajeMinimo: Float
+}
+
+# Tipos de entrada para validación
+input ValidarCreacionSolicitudInput {
+  expedienteId: String!
+  categoriaChecklistId: String!
+  montoSolicitado: Float!
+}
+
+# Tipo principal TipoPagoOC
+type TipoPagoOC {
+  id: ID!
+  expedienteId: String!
+  categoriaChecklistId: String!
+  checklistId: String!
+  fechaAsignacion: DateTime!
+  modoRestriccion: String!
+  orden: Int
+  requiereAnteriorPagado: Boolean
+  porcentajeMaximo: Float
+  porcentajeMinimo: Float
+  
+  # Relaciones (opcional, si se necesitan)
+  categoria: CategoriaChecklist
+  checklist: PlantillaChecklist
+  expediente: ExpedientePago
+}
+
+# Respuesta de validación
+type ValidacionSolicitudResponse {
+  puedeCrear: Boolean!
+  motivo: String
+}
+
+# Queries para TipoPagoOC
+extend type Query {
+  # Obtener un tipo de pago OC por ID
+  obtenerTipoPagoOC(id: ID!): TipoPagoOC
+  
+  # Listar tipos de pago OC con filtros
+  listarTiposPagoOC(filter: TipoPagoOCFilter): [TipoPagoOC!]!
+  
+  # Obtener tipos de pago por expediente
+  obtenerTiposPagoPorExpediente(expedienteId: String!): [TipoPagoOC!]!
+  
+  # Validar si se puede crear una solicitud de pago
+  validarCreacionSolicitud(input: ValidarCreacionSolicitudInput!): ValidacionSolicitudResponse!
+}
+
+# Mutations para TipoPagoOC
+extend type Mutation {
+  # Crear un nuevo tipo de pago OC
+  crearTipoPagoOC(input: TipoPagoOCInput!): TipoPagoOC
+  
+  # Actualizar un tipo de pago OC
+  actualizarTipoPagoOC(id: ID!, input: UpdateTipoPagoOCInput!): TipoPagoOC
+  
+  # Eliminar un tipo de pago OC
+  eliminarTipoPagoOC(id: ID!): Boolean
+}

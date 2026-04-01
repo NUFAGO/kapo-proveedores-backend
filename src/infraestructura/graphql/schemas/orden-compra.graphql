@@ -1,0 +1,138 @@
+# Schema para Órdenes de Compra consumidas del inacons-backend
+
+type OrdenCompra {
+  id: ID!
+  codigo_orden: String
+  cotizacion_id: Cotizacion
+  estado: String
+  descripcion: String!
+  fecha_ini: DateTime
+  fecha_fin: DateTime
+  tipo: String
+  total: Float
+  requerimiento: [RequerimientoOrdenCompra]
+  obra_id: String
+  req_usuario_id: String
+  codigo_rq: String
+  proveedor_id: ID
+  divisa_id: String
+  estado_almacen: String
+  estado_comprobante: String
+  cantidad_cierre: Float
+  tiene_expediente: Boolean
+  pagos: [PagoOrdenCompra]
+  proveedor: Proveedor
+  obra: Obra
+  comprobantes: [ComprobanteOrdenCompra]
+}
+
+type Cotizacion {
+  id: ID!
+  codigo_cotizacion: String
+  aprobacion: Boolean
+  estado: String
+  fecha: DateTime
+  usuario_id: Usuario
+}
+
+type RequerimientoOrdenCompra {
+  obra_id: String
+  req_usuario_id: String
+  codigo_rq: String
+  empresa_id: String
+}
+
+type PagoOrdenCompra {
+  monto_solicitado: Float!
+  estado: String!
+}
+
+type Obra {
+  id: ID!
+  titulo: String
+  nombre: String
+  descripcion: String
+  direccion: String
+  estado: String
+}
+
+type ComprobanteOrdenCompra {
+  _id: ID!
+  serie: String!
+  numeracion: String!
+  monto: Float!
+  estado: String!
+  comentario_aprobacion: String
+  archivo_url: String
+}
+
+type Usuario {
+  id: ID!
+  nombres: String
+  apellidos: String
+  dni: String
+}
+
+type Proveedor {
+  id: ID!
+  nombre_comercial: String
+  ruc: String
+  razon_social: String
+  telefono: String
+  correo: String
+  direccion: String
+  rubro: String
+  estado: String
+  tipo: String
+  actividad: String
+  estado_sunat: String
+  condicion: String
+  agente_retencion: Boolean
+  sub_contrata: Boolean
+  distrito: String
+  provincia: String
+  departamento: String
+}
+
+# Input para filtros de paginación
+input OrdenCompraPaginationInput {
+  page: Int
+  limit: Int
+  fechaInicio: DateTime
+  fechaFin: DateTime
+  usuarioRQ: [ID!]
+  usuarioOC: [ID!]
+  estados: [String!]
+  empresas: [ID!]
+  obras: [ID!]
+  tipos: [String!]
+  estado_almacen: [String!]
+  estado_comprobante: [String!]
+  searchTerm: String
+  descripcion: String
+  codigoCOT: String
+  proveedores: [ID!]
+  codigoRQ: String
+  total: Float
+  estadoPago: String
+  comprobante: String
+  tieneExpediente: Boolean
+}
+
+# Respuesta paginada
+type OrdenCompraPaginatedResponse {
+  data: [OrdenCompra!]!
+  total: Int!
+  page: Int!
+  limit: Int!
+  totalPages: Int!
+}
+
+# Consultas disponibles
+type Query {
+  listOrdenComprasPaginated(
+    filter: OrdenCompraPaginationInput
+  ): OrdenCompraPaginatedResponse!
+}
+
+scalar DateTime

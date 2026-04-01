@@ -1,0 +1,92 @@
+# Tipos de entrada para SolicitudPago
+input SolicitudPagoInput {
+  expedienteId: String!
+  tipoPagoOCId: String!
+  montoSolicitado: Float!
+}
+
+# Enum para estados de SolicitudPago
+enum SolicitudPago_Estado {
+  BORRADOR
+  EN_REVISION
+  OBSERVADA
+  RECHAZADA
+  APROBADO
+}
+
+input SolicitudPagoFilter {
+  expedienteId: String
+  tipoPagoOCId: String
+  estado: String
+  fechaCreacionDesde: DateTime
+  fechaCreacionHasta: DateTime
+}
+
+# Tipos de entrada para aprobación/observación
+input AprobarSolicitudInput {
+  id: ID!
+}
+
+input ObservarSolicitudInput {
+  id: ID!
+  comentarios: String!
+}
+
+input RechazarSolicitudInput {
+  id: ID!
+  comentarios: String!
+}
+
+# Tipo principal SolicitudPago
+type SolicitudPago {
+  id: ID!
+  expedienteId: String!
+  tipoPagoOCId: String!
+  montoSolicitado: Float!
+  estado: SolicitudPago_Estado!
+  fechaCreacion: DateTime!
+  documentosSubidos: [DocumentoSubido!]!
+  
+  # Relaciones
+  expediente: ExpedientePago
+  tipoPagoOC: TipoPagoOC
+}
+
+# Queries para SolicitudPago
+extend type Query {
+  # Obtener una solicitud de pago por ID
+  obtenerSolicitudPago(id: ID!): SolicitudPago
+  
+  # Listar solicitudes de pago con filtros
+  listarSolicitudesPago(filter: SolicitudPagoFilter): [SolicitudPago!]!
+  
+  # Obtener solicitudes de pago por expediente
+  obtenerSolicitudesPorExpediente(expedienteId: String!): [SolicitudPago!]!
+  
+  # Obtener solicitudes por tipo de pago
+  obtenerSolicitudesPorTipoPago(tipoPagoOCId: String!): [SolicitudPago!]!
+}
+
+# Mutations para SolicitudPago
+extend type Mutation {
+  # Crear una nueva solicitud de pago
+  crearSolicitudPago(input: SolicitudPagoInput!): SolicitudPago
+  
+  # Actualizar una solicitud de pago
+  actualizarSolicitudPago(id: ID!, input: SolicitudPagoInput!): SolicitudPago
+  
+  # Enviar solicitud a revisión
+  enviarSolicitudRevision(id: ID!, usuarioId: String!): SolicitudPago
+  
+  # Aprobar solicitud de pago
+  aprobarSolicitudPago(input: AprobarSolicitudInput!): SolicitudPago
+  
+  # Observar solicitud de pago
+  observarSolicitudPago(input: ObservarSolicitudInput!): SolicitudPago
+  
+  # Rechazar solicitud de pago
+  rechazarSolicitudPago(input: RechazarSolicitudInput!): SolicitudPago
+  
+  # Eliminar una solicitud de pago (solo si está en borrador)
+  eliminarSolicitudPago(id: ID!): Boolean
+}

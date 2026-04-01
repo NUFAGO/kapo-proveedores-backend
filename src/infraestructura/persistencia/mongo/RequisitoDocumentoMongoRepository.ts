@@ -4,11 +4,16 @@ import {
   RequisitoDocumentoInput, 
   RequisitoDocumentoFiltros 
 } from '../../../dominio/entidades/PlantillaChecklist';
-import { RequisitoDocumentoModel, IRequisitoDocumentoDocument } from './schemas/RequisitoDocumentoSchema';
+import { RequisitoDocumentoModel } from './schemas/RequisitoDocumentoSchema';
 import { Types } from 'mongoose';
 
 export class RequisitoDocumentoMongoRepository implements IRequisitoDocumentoRepository {
   async crear(input: RequisitoDocumentoInput): Promise<RequisitoDocumento> {
+    // Validar que checklistId esté presente
+    if (!input.checklistId) {
+      throw new Error('checklistId es requerido para crear un requisito');
+    }
+    
     const document = new RequisitoDocumentoModel({
       ...input,
       _id: new Types.ObjectId()
@@ -168,13 +173,14 @@ export class RequisitoDocumentoMongoRepository implements IRequisitoDocumentoRep
     return latest?.orden || 0;
   }
 
-  private mapToEntity(doc: IRequisitoDocumentoDocument): RequisitoDocumento {
+  private mapToEntity(doc: any): RequisitoDocumento {
     const entity: RequisitoDocumento = {
       id: doc._id.toString(),
       checklistId: doc.checklistId.toString(),
       tipoRequisito: doc.tipoRequisito,
       obligatorio: doc.obligatorio,
-      orden: doc.orden
+      orden: doc.orden,
+      activo: doc.activo ?? true // Usar valor del documento o default true
     };
 
     if (doc.plantillaDocumentoId) {

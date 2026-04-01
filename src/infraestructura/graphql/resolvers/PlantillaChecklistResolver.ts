@@ -85,7 +85,7 @@ export class PlantillaChecklistResolver {
 
         obtenerPlantillaChecklist: adminGuard(async (_: any, args: { id: string }) => {
           return await ErrorHandler.handleError(async () => {
-              return await this.plantillaService.obtenerPorId(args.id);
+              return await this.plantillaService.obtenerConRequisitos(args.id);
             }, 'obtenerPlantillaChecklist');
           }),
 
@@ -111,26 +111,7 @@ export class PlantillaChecklistResolver {
           return await ErrorHandler.handleError(async () => {
               return await this.plantillaService.listarPorCategoria(args.categoriaChecklistId);
             }, 'findPlantillasPorCategoria');
-          }),
-
-        findVigentesPlantillaChecklist: adminGuard(async () => {
-          return await ErrorHandler.handleError(async () => {
-              return await this.plantillaService.listarVigentes();
-            }, 'findVigentesPlantillaChecklist');
-          }),
-
-        // Queries de versionamiento
-        obtenerVersionesPorCodigo: adminGuard(async (_: any, args: { codigo: string }) => {
-          return await ErrorHandler.handleError(async () => {
-              return await this.plantillaService.obtenerVersionesPorCodigo(args.codigo);
-            }, 'obtenerVersionesPorCodigo');
-          }),
-
-        obtenerVersionVigentePorCodigo: adminGuard(async (_: any, args: { codigo: string }) => {
-          return await ErrorHandler.handleError(async () => {
-              return await this.plantillaService.obtenerVersionVigentePorCodigo(args.codigo);
-            }, 'obtenerVersionVigentePorCodigo');
-          }),
+        }),
 
         // RequisitosDocumento
         listarRequisitosPorChecklist: adminGuard(async (_: any, args: { checklistId: string }) => {
@@ -160,6 +141,12 @@ export class PlantillaChecklistResolver {
 
       Mutation: {
         // PlantillasChecklist
+        guardarPlantillaChecklist: adminGuard(async (_: any, args: { input: any }) => {
+          return await ErrorHandler.handleError(async () => {
+              return await this.plantillaService.guardarCompleto(args.input);
+            }, 'guardarPlantillaChecklist');
+        }),
+
         crearPlantillaChecklist: adminGuard(async (_: any, args: CreatePlantillaChecklistArgs) => {
           return await ErrorHandler.handleError(async () => {
             return await this.plantillaService.crear(args.input);
@@ -180,18 +167,6 @@ export class PlantillaChecklistResolver {
           return await ErrorHandler.handleError(async () => {
               return await this.plantillaService.eliminar(args.id);
             }, 'eliminarPlantillaChecklist');
-        }),
-
-        duplicarPlantillaChecklist: adminGuard(async (_: any, args: { id: string; nuevoNombre: string }) => {
-          return await ErrorHandler.handleError(async () => {
-              return await this.plantillaService.duplicar(args.id, args.nuevoNombre);
-            }, 'duplicarPlantillaChecklist');
-        }),
-
-        crearNuevaVersion: adminGuard(async (_: any, args: { checklistId: string }) => {
-          return await ErrorHandler.handleError(async () => {
-              return await this.plantillaService.crearNuevaVersion(args.checklistId);
-            }, 'crearNuevaVersion');
         }),
 
         // RequisitosDocumento
@@ -215,6 +190,12 @@ export class PlantillaChecklistResolver {
           return await ErrorHandler.handleError(async () => {
               return await this.requisitoService.eliminar(args.id);
             }, 'eliminarRequisitoDocumento');
+        }),
+
+        toggleActivoRequisitoDocumento: adminGuard(async (_: any, args: { id: string }) => {
+          return await ErrorHandler.handleError(async () => {
+              return await this.requisitoService.toggleActivo(args.id);
+            }, 'toggleActivoRequisitoDocumento');
         }),
 
         reordenarRequisitos: adminGuard(async (_: any, args: ReordenarRequisitosArgs) => {

@@ -7,6 +7,7 @@ import {
 } from '../../../dominio/entidades/PlantillaChecklist';
 import { IPlantillaChecklistRepository } from '../../../dominio/repositorios/IPlantillaChecklistRepository';
 import { PlantillaChecklistModel } from './schemas/PlantillaChecklistSchema';
+import { Types } from 'mongoose';
 
 export class PlantillaChecklistMongoRepository extends BaseMongoRepository<PlantillaChecklist> implements IPlantillaChecklistRepository {
   constructor() {
@@ -28,20 +29,18 @@ export class PlantillaChecklistMongoRepository extends BaseMongoRepository<Plant
       nombre: doc.categoriaChecklistId.nombre,
       tipoUso: doc.categoriaChecklistId.tipoUso || '',
       descripcion: doc.categoriaChecklistId.descripcion,
+      estado: doc.categoriaChecklistId.estado ?? 'activo', // ✅ Agregar campo estado
       fechaCreacion: doc.categoriaChecklistId.fechaCreacion?.toISOString?.() || new Date().toISOString(),
       fechaActualizacion: doc.categoriaChecklistId.fechaActualizacion?.toISOString?.()
     } : undefined;
-
-    const fechaActualizacion = doc.fechaActualizacion?.toISOString();
 
     const result: PlantillaChecklist = {
       id: doc._id.toString(),
       codigo: doc.codigo,
       nombre: doc.nombre,
+      descripcion: doc.descripcion,
       categoriaChecklistId,
-      version: doc.version,
-      plantillaBaseId: doc.plantillaBaseId,
-      vigente: doc.vigente,
+      ...(categoria && { categoria }),
       activo: doc.activo,
       fechaCreacion: doc.fechaCreacion.toISOString(),
       requisitos: doc.requisitos?.map((req: any) => ({
@@ -51,29 +50,9 @@ export class PlantillaChecklistMongoRepository extends BaseMongoRepository<Plant
         plantillaDocumentoId: req.plantillaDocumentoId,
         formularioId: req.formularioId,
         obligatorio: req.obligatorio,
-        formatosPermitidos: req.formatosPermitidos,
         orden: req.orden,
-        plantillaDocumento: req.plantillaDocumento ? {
-          id: req.plantillaDocumento._id?.toString() || req.plantillaDocumento.toString(),
-          nombrePlantilla: req.plantillaDocumento.nombrePlantilla,
-          plantillaUrl: req.plantillaDocumento.plantillaUrl,
-          activo: req.plantillaDocumento.activo,
-          tipoDocumento: req.plantillaDocumento.tipoDocumento ? {
-            id: req.plantillaDocumento.tipoDocumento._id?.toString() || req.plantillaDocumento.tipoDocumento.toString(),
-            codigo: req.plantillaDocumento.tipoDocumento.codigo,
-            nombre: req.plantillaDocumento.tipoDocumento.nombre,
-            descripcion: req.plantillaDocumento.tipoDocumento.descripcion
-          } : undefined
-        } : undefined,
-        formulario: req.formulario ? {
-          id: req.formulario._id?.toString() || req.formulario.toString(),
-          nombre: req.formulario.nombre,
-          descripcion: req.formulario.descripcion
-        } : undefined
-      })) || [],
-      ...(doc.descripcion && { descripcion: doc.descripcion }),
-      ...(categoria && { categoria }),
-      ...(fechaActualizacion && { fechaActualizacion })
+        activo: req.activo
+      })) || []
     };
 
     return result;
@@ -85,14 +64,11 @@ export class PlantillaChecklistMongoRepository extends BaseMongoRepository<Plant
       nombre: input.nombre.trim(),
       descripcion: input.descripcion?.trim(),
       categoriaChecklistId: input.categoriaChecklistId,
-      version: input.version || 1, // Por defecto versión 1
-      plantillaBaseId: input.plantillaBaseId,
-      vigente: input.vigente !== undefined ? input.vigente : true, // Por defecto vigente
-      activo: input.activo !== undefined ? input.activo : true // Por defecto activo
+      activo: input.activo ?? true
     });
 
-    const saved = await newPlantilla.save();
-    return this.toDomain(saved);
+    const savedPlantilla = await newPlantilla.save();
+    return this.toDomain(savedPlantilla);
   }
 
   async obtenerPorId(id: string): Promise<PlantillaChecklist | null> {
@@ -112,26 +88,134 @@ export class PlantillaChecklistMongoRepository extends BaseMongoRepository<Plant
 
   async obtenerConRequisitos(id: string): Promise<PlantillaChecklist | null> {
     try {
-      const doc = await PlantillaChecklistModel.findById(id)
-        .populate({
-          path: 'categoriaChecklistId',
-          select: 'nombre tipoUso descripcion fechaCreacion fechaActualizacion',
-          match: { nombre: { $exists: true, $ne: null } } // Solo populate si nombre existe y no es null
-        })
-        .populate({
-          path: 'requisitos',
-          populate: {
-            path: 'plantillaDocumento',
-            populate: {
-              path: 'tipoDocumento',
-              select: 'codigo nombre descripcion'
-            }
-          }
-        }); // Populate de requisitos y sus tipos de documento
+      // Validar que el ID sea válido
+      if (!Types.ObjectId.isValid(id)) {
+        return null;
+      }
+      
+      const objectId = new Types.ObjectId(id);
+      
+      // Usar aggregation pipeline como en listarConRequisitos
+      const pipeline: any[] = [
+        // Match por ID y activo (igual que listarConRequisitos)
+        { $match: { _id: objectId, activo: true } },
         
-      if (!doc) return null;
+        // Agregar campo _id como string para el lookup
+        {
+          $addFields: {
+            checklistIdString: { $toString: "$_id" },
+            categoriaChecklistIdString: { $toString: "$categoriaChecklistId" }
+          }
+        },
+        
+        // Lookup para traer requisitos
+        {
+          $lookup: {
+            from: 'requisitos_documento',
+            localField: 'checklistIdString',
+            foreignField: 'checklistId',
+            as: 'requisitos'
+          }
+        },
+        
+        // Lookup para traer plantillaDocumento de cada requisito
+        {
+          $lookup: {
+            from: 'plantilladocumentos',    // Nombre correcto de la colección (plural y minúsculas)
+            let: { requisitosIds: '$requisitos' },
+            pipeline: [
+              {
+                $match: {
+                  $expr: {
+                    $in: ['$_id', {
+                      $map: {
+                        input: '$$requisitosIds',
+                        as: 'req',
+                        in: { $toObjectId: '$$req.plantillaDocumentoId' }
+                      }
+                    }]
+                  }
+                }
+              }
+            ],
+            as: 'plantillasDocumento'
+          }
+        },
+        
+        // Populate de categoría
+        {
+          $lookup: {
+            from: 'categoriachecklists',
+            localField: 'categoriaChecklistIdString',
+            foreignField: '_id',
+            as: 'categoria'
+          }
+        },
+        
+        // Unwind de categoría
+        { $unwind: { path: '$categoria', preserveNullAndEmptyArrays: true } }
+      ];
 
-      return this.toDomain(doc);
+      const docs = await PlantillaChecklistModel.aggregate(pipeline).exec();
+      
+      if (docs.length === 0) return null;
+      
+      const doc = docs[0];
+
+      // Formatear categoría si existe
+      const categoria = doc.categoria ? {
+        id: doc.categoria._id?.toString() || doc.categoria._id,
+        nombre: doc.categoria.nombre,
+        tipoUso: doc.categoria.tipoUso || '',
+        descripcion: doc.categoria.descripcion,
+        estado: doc.categoria.estado ?? 'activo',
+        fechaCreacion: doc.categoria.fechaCreacion?.toISOString?.() || new Date().toISOString(),
+        fechaActualizacion: doc.categoria.fechaActualizacion?.toISOString?.()
+      } : undefined;
+
+      // Formatear requisitos
+      const requisitosDomain = (doc.requisitos || [])
+        .filter((req: any) => req && req._id)
+        .map((req: any) => {
+          // Buscar la plantilla de documento asociada
+          const plantillaDocumento = req.plantillaDocumentoId && doc.plantillasDocumento
+            ? doc.plantillasDocumento.find((pd: any) => pd._id.toString() === req.plantillaDocumentoId)
+            : null;
+
+          return {
+            id: req._id.toString(),
+            checklistId: req.checklistId || doc._id.toString(),
+            tipoRequisito: req.tipoRequisito || 'documento',
+            plantillaDocumentoId: req.plantillaDocumentoId,
+            formularioId: req.formularioId,
+            obligatorio: Boolean(req.obligatorio),
+            orden: Number(req.orden) || 0,
+            activo: req.activo ?? true,
+            plantillaDocumento: plantillaDocumento ? {
+              id: plantillaDocumento._id.toString(),
+              codigo: plantillaDocumento.codigo,
+              tipoDocumentoId: plantillaDocumento.tipoDocumentoId,
+              nombrePlantilla: plantillaDocumento.nombrePlantilla,
+              plantillaUrl: plantillaDocumento.plantillaUrl,
+              formatosPermitidos: plantillaDocumento.formatosPermitidos,
+              fechaCreacion: plantillaDocumento.fechaCreacion?.toISOString?.() || new Date().toISOString(),
+              activo: plantillaDocumento.activo
+            } : null
+          };
+        });
+
+      // Construir objeto de dominio
+      return {
+        id: doc._id.toString(),
+        codigo: doc.codigo,
+        nombre: doc.nombre,
+        descripcion: doc.descripcion,
+        categoriaChecklistId: doc.categoriaChecklistId,
+        ...(categoria && { categoria }),
+        activo: doc.activo,
+        fechaCreacion: doc.fechaCreacion?.toISOString?.() || new Date().toISOString(),
+        requisitos: requisitosDomain
+      };
     } catch (error) {
       console.error('Error al obtener plantilla de checklist con requisitos:', error);
       throw error;
@@ -146,9 +230,6 @@ export class PlantillaChecklistMongoRepository extends BaseMongoRepository<Plant
       if (input.nombre !== undefined) updateData.nombre = input.nombre.trim();
       if (input.descripcion !== undefined) updateData.descripcion = input.descripcion?.trim();
       if (input.categoriaChecklistId !== undefined) updateData.categoriaChecklistId = input.categoriaChecklistId;
-      if (input.version !== undefined) updateData.version = input.version;
-      if (input.plantillaBaseId !== undefined) updateData.plantillaBaseId = input.plantillaBaseId;
-      if (input.vigente !== undefined) updateData.vigente = input.vigente;
       if (input.activo !== undefined) updateData.activo = input.activo;
 
       const doc = await PlantillaChecklistModel.findByIdAndUpdate(
@@ -243,41 +324,157 @@ export class PlantillaChecklistMongoRepository extends BaseMongoRepository<Plant
         if (filtros.activo !== undefined) {
           mongoFiltros.activo = filtros.activo;
         }
-        if (filtros.vigente !== undefined) {
-          mongoFiltros.vigente = filtros.vigente;
-        }
       }
 
-      // Obtener documentos con populate seguro
-      const docs = await PlantillaChecklistModel.find(mongoFiltros)
-        .populate({
-          path: 'categoriaChecklistId',
-          select: 'nombre tipoUso descripcion fechaCreacion fechaActualizacion',
-          match: { nombre: { $exists: true, $ne: null } } // Solo populate si nombre existe y no es null
-        })
-        .populate({
-          path: 'requisitos',
-          populate: {
-            path: 'plantillaDocumento',
-            populate: {
-              path: 'tipoDocumento',
-              select: 'codigo nombre descripcion'
-            }
+      // Obtener plantillas con requisitos usando aggregation pipeline (más eficiente)
+      const pipeline: any[] = [
+        // Match con filtros
+        { $match: mongoFiltros },
+        
+        // Agregar campo _id como string para el lookup
+        {
+          $addFields: {
+            checklistIdString: { $toString: "$_id" },
+            categoriaChecklistIdString: { $toString: "$categoriaChecklistId" }
           }
-        }) // Populate de requisitos y sus tipos de documento
-        .sort({ fechaCreacion: -1 })
-        .limit(limit)
-        .skip(offset)
-        .exec();
+        },
+        
+        // Lookup para traer requisitos
+        {
+          $lookup: {
+            from: 'requisitos_documento',  //  Nombre real de la colección
+            localField: 'checklistIdString', // Usar el string convertido
+            foreignField: 'checklistId',     // checklistId ya es string
+            as: 'requisitos'
+          }
+        },
+        
+        // Lookup para traer plantillaDocumento de cada requisito
+        {
+          $lookup: {
+            from: 'plantilladocumentos',    // Nombre correcto de la colección (plural y minúsculas)
+            let: { requisitosIds: '$requisitos' },
+            pipeline: [
+              {
+                $match: {
+                  $expr: {
+                    $in: ['$_id', {
+                      $map: {
+                        input: '$$requisitosIds',
+                        as: 'req',
+                        in: { $toObjectId: '$$req.plantillaDocumentoId' }
+                      }
+                    }]
+                  }
+                }
+              }
+            ],
+            as: 'plantillasDocumento'
+          }
+        },
+        
+        // Populate de categoría
+        {
+          $lookup: {
+            from: 'categoriachecklists',   // Nombre correcto de la colección
+            let: { categoriaId: "$categoriaChecklistIdString" }, // Pasar el string como variable
+            pipeline: [
+              {
+                $addFields: {
+                  categoriaIdString: { $toString: "$_id" } // Convertir ObjectId a string
+                }
+              },
+              {
+                $match: {
+                  $expr: {
+                    $eq: ["$categoriaIdString", "$$categoriaId"] // Comparar strings
+                  }
+                }
+              }
+            ],
+            as: 'categoria'
+          }
+        },
+        
+        // Unwind de categoría (ya que es uno a uno)
+        { $unwind: { path: '$categoria', preserveNullAndEmptyArrays: true } },
+        
+        // Ordenamiento
+        { $sort: { fechaCreacion: -1 } },
+        
+        // Paginación
+        { $skip: offset },
+        { $limit: limit }
+      ];
+
+      const docs = await PlantillaChecklistModel.aggregate(pipeline).exec();
+
+      // Procesar resultados del aggregation
+      const plantillasConRequisitos = docs.map((doc: any) => {
+        // Formatear categoría si existe
+        const categoria = doc.categoria ? {
+          id: doc.categoria._id?.toString() || doc.categoria._id,
+          nombre: doc.categoria.nombre,
+          tipoUso: doc.categoria.tipoUso || '',
+          descripcion: doc.categoria.descripcion,
+          estado: doc.categoria.estado ?? 'activo', // ✅ Agregar campo estado
+          fechaCreacion: doc.categoria.fechaCreacion?.toISOString?.() || new Date().toISOString(),
+          fechaActualizacion: doc.categoria.fechaActualizacion?.toISOString?.()
+        } : undefined;
+
+        // Formatear requisitos
+        const requisitosDomain = (doc.requisitos || [])
+          .filter((req: any) => req && req._id)
+          .map((req: any) => {
+            // Buscar la plantilla de documento asociada
+            const plantillaDocumento = req.plantillaDocumentoId && doc.plantillasDocumento
+              ? doc.plantillasDocumento.find((pd: any) => pd._id.toString() === req.plantillaDocumentoId)
+              : null;
+
+            return {
+              id: req._id.toString(),
+              checklistId: req.checklistId || doc._id.toString(),
+              tipoRequisito: req.tipoRequisito || 'documento',
+              plantillaDocumentoId: req.plantillaDocumentoId,
+              formularioId: req.formularioId,
+              obligatorio: Boolean(req.obligatorio),
+              orden: Number(req.orden) || 0,
+              activo: req.activo ?? true,
+              plantillaDocumento: plantillaDocumento ? {
+                id: plantillaDocumento._id.toString(),
+                codigo: plantillaDocumento.codigo,
+                tipoDocumentoId: plantillaDocumento.tipoDocumentoId,
+                nombrePlantilla: plantillaDocumento.nombrePlantilla,
+                plantillaUrl: plantillaDocumento.plantillaUrl,
+                formatosPermitidos: plantillaDocumento.formatosPermitidos,
+                fechaCreacion: plantillaDocumento.fechaCreacion?.toISOString?.() || new Date().toISOString(),
+                activo: plantillaDocumento.activo
+              } : null
+            };
+          });
+
+        // Construir objeto de dominio
+        return {
+          id: doc._id.toString(),
+          codigo: doc.codigo,
+          nombre: doc.nombre,
+          descripcion: doc.descripcion,
+          categoriaChecklistId: doc.categoriaChecklistId,
+          ...(categoria && { categoria }),
+          activo: doc.activo,
+          fechaCreacion: doc.fechaCreacion?.toISOString?.() || new Date().toISOString(),
+          requisitos: requisitosDomain
+        };
+      });
 
       const totalCount = await PlantillaChecklistModel.countDocuments(mongoFiltros);
 
       return {
-        plantillasChecklist: docs.map(doc => this.toDomain(doc)),
+        plantillasChecklist: plantillasConRequisitos,
         totalCount
       };
     } catch (error) {
-      console.error('Error al listar plantillas de checklist con requisitos:', error);
+      console.error('Error al listar plantillas con requisitos:', error);
       throw error;
     }
   }
@@ -309,7 +506,7 @@ export class PlantillaChecklistMongoRepository extends BaseMongoRepository<Plant
   async listarPorCategoria(categoriaChecklistId: string): Promise<PlantillaChecklist[]> {
     try {
       const docs = await PlantillaChecklistModel.find({ categoriaChecklistId })
-        .sort({ version: -1 });
+        .sort({ fechaCreacion: -1 });
 
       return docs.map(doc => this.toDomain(doc));
     } catch (error) {
@@ -356,103 +553,23 @@ export class PlantillaChecklistMongoRepository extends BaseMongoRepository<Plant
     }
   }
 
-  async obtenerUltimaVersion(categoriaChecklistId: string): Promise<number> {
-    try {
-      const doc = await PlantillaChecklistModel.findOne({ categoriaChecklistId })
-        .sort({ version: -1 })
-        .limit(1);
-
-      return doc ? doc.version : 0;
-    } catch (error) {
-      console.error('Error al obtener última versión:', error);
-      throw error;
-    }
-  }
-
-  async listarPorPlantillaBase(plantillaBaseId: string): Promise<PlantillaChecklist[]> {
-    try {
-      const docs = await PlantillaChecklistModel.find({ plantillaBaseId })
-        .sort({ version: -1 });
-
-      return docs.map(doc => this.toDomain(doc));
-    } catch (error) {
-      console.error('Error al listar plantillas por plantilla base:', error);
-      throw error;
-    }
-  }
-
-  // Nuevos métodos para versionamiento
-  async obtenerVersionesPorCodigo(codigo: string): Promise<PlantillaChecklist[]> {
-    try {
-      const docs = await PlantillaChecklistModel.find({ codigo })
-        .sort({ version: 1 });
-
-      return docs.map(doc => this.toDomain(doc));
-    } catch (error) {
-      console.error('Error al obtener versiones por código:', error);
-      throw error;
-    }
-  }
-
-  async obtenerVersionVigentePorCodigo(codigo: string): Promise<PlantillaChecklist | null> {
-    try {
-      const doc = await PlantillaChecklistModel.findOne({ codigo, vigente: true });
-      return doc ? this.toDomain(doc) : null;
-    } catch (error) {
-      console.error('Error al obtener versión vigente por código:', error);
-      throw error;
-    }
-  }
-
-  async crearNuevaVersion(checklistId: string): Promise<PlantillaChecklist> {
-    try {
-      // Obtener la versión actual
-      const actual = await PlantillaChecklistModel.findById(checklistId);
-      if (!actual) {
-        throw new Error('Plantilla de checklist no encontrada');
-      }
-
-      // Desactivar versión vigente actual
-      await PlantillaChecklistModel.updateOne(
-        { codigo: actual.codigo, vigente: true },
-        { vigente: false }
-      );
-
-      // Obtener la última versión para este código
-      const ultimaVersion = await PlantillaChecklistModel.findOne({ codigo: actual.codigo })
-        .sort({ version: -1 });
-
-      const nuevaVersion = (ultimaVersion?.version || 0) + 1;
-
-      // Crear nueva versión
-      const nuevaPlantilla = new PlantillaChecklistModel({
-        codigo: actual.codigo, // Mantener el mismo código
-        nombre: `${actual.nombre} v${nuevaVersion}`,
-        descripcion: actual.descripcion,
-        categoriaChecklistId: actual.categoriaChecklistId,
-        version: nuevaVersion,
-        plantillaBaseId: actual.plantillaBaseId, // Mismo plantillaBaseId
-        vigente: true, // Nueva versión es vigente
-        activo: true
-      });
-
-      const saved = await nuevaPlantilla.save();
-      return this.toDomain(saved.toObject());
-    } catch (error) {
-      console.error('Error al crear nueva versión:', error);
-      throw error;
-    }
-  }
 
   async listarVigentes(): Promise<PlantillaChecklist[]> {
     try {
-      const docs = await PlantillaChecklistModel.find({ vigente: true })
-        .sort({ nombre: 1 });
-
+      const docs = await PlantillaChecklistModel.find({ activo: true })
+        .populate({
+          path: 'categoriaChecklistId',
+          select: 'nombre tipoUso descripcion fechaCreacion fechaActualizacion',
+          match: { nombre: { $exists: true, $ne: null } }
+        })
+        .sort({ fechaCreacion: -1 });
+      
       return docs.map(doc => this.toDomain(doc));
     } catch (error) {
       console.error('Error al listar plantillas vigentes:', error);
       throw error;
     }
   }
+
+// ...
 }

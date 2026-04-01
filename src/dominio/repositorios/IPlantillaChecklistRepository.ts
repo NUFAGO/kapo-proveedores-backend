@@ -36,11 +36,4 @@ export interface IPlantillaChecklistRepository {
   // Utilidades
   contarPorFiltros(filtros?: PlantillaChecklistFiltros): Promise<number>
   existeNombre(nombre: string, excludeId?: string): Promise<boolean>
-  
-  // Versionamiento
-  obtenerUltimaVersion(categoriaChecklistId: string): Promise<number>
-  listarPorPlantillaBase(plantillaBaseId: string): Promise<PlantillaChecklist[]>
-  obtenerVersionesPorCodigo(codigo: string): Promise<PlantillaChecklist[]>
-  obtenerVersionVigentePorCodigo(codigo: string): Promise<PlantillaChecklist | null>
-  crearNuevaVersion(checklistId: string): Promise<PlantillaChecklist>
 }

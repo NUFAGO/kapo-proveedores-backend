@@ -24,6 +24,7 @@ type RequisitoDocumento {
   formularioId: String
   obligatorio: Boolean!
   orden: Int!
+  activo: Boolean!
   plantillaDocumento: PlantillaDocumento
   formulario: PlantillaFormulario
 }
@@ -35,9 +36,6 @@ type PlantillaChecklist {
   descripcion: String
   categoriaChecklistId: String!
   categoria: CategoriaChecklist
-  version: Int!
-  plantillaBaseId: String!
-  vigente: Boolean!
   activo: Boolean!
   fechaCreacion: DateTime!
   fechaActualizacion: DateTime
@@ -56,7 +54,6 @@ input PlantillaChecklistFiltros {
   nombre: String
   categoriaChecklistId: String
   activo: Boolean
-  vigente: Boolean
   categoriaTipoUso: String
 }
 
@@ -66,6 +63,7 @@ input RequisitoDocumentoFiltros {
   obligatorio: Boolean
   plantillaDocumentoId: String
   formularioId: String
+  activo: Boolean
 }
 
 # Inputs para creación/actualización
@@ -74,9 +72,6 @@ input PlantillaChecklistInput {
   nombre: String!
   descripcion: String
   categoriaChecklistId: String!
-  version: Int
-  plantillaBaseId: String
-  vigente: Boolean
   activo: Boolean!
 }
 
@@ -87,6 +82,18 @@ input RequisitoDocumentoInput {
   formularioId: String
   obligatorio: Boolean!
   orden: Int!
+  activo: Boolean
+}
+
+input RequisitoDocumentoUpdateInput {
+  id: ID!
+  checklistId: String
+  tipoRequisito: String
+  plantillaDocumentoId: String
+  formularioId: String
+  obligatorio: Boolean
+  orden: Int
+  activo: Boolean
 }
 
 # Query principal
@@ -109,12 +116,7 @@ type Query {
   
   findActivasPlantillaChecklist: [PlantillaChecklist]!
   findInactivasPlantillaChecklist: [PlantillaChecklist]!
-  findVigentesPlantillaChecklist: [PlantillaChecklist]!
   findPlantillasPorCategoria(categoriaChecklistId: String!): [PlantillaChecklist]!
-  
-  # Queries de versionamiento
-  obtenerVersionesPorCodigo(codigo: String!): [PlantillaChecklist]!
-  obtenerVersionVigentePorCodigo(codigo: String!): PlantillaChecklist
   
   # RequisitosDocumento
   listarRequisitosPorChecklist(checklistId: String!): [RequisitoDocumento]!
@@ -126,16 +128,16 @@ type Query {
 # Mutations
 type Mutation {
   # PlantillasChecklist
+  guardarPlantillaChecklist(input: GuardarPlantillaChecklistInput!): PlantillaChecklist!
   crearPlantillaChecklist(input: PlantillaChecklistInput!): PlantillaChecklist!
   actualizarPlantillaChecklist(id: ID!, input: PlantillaChecklistInput!): PlantillaChecklist!
   eliminarPlantillaChecklist(id: ID!): Boolean!
-  duplicarPlantillaChecklist(id: ID!, nuevoNombre: String!): PlantillaChecklist!
-  crearNuevaVersion(checklistId: ID!): PlantillaChecklist!
   
   # RequisitosDocumento
   crearRequisitoDocumento(input: RequisitoDocumentoInput!): RequisitoDocumento!
   actualizarRequisitoDocumento(id: ID!, input: RequisitoDocumentoInput!): RequisitoDocumento!
   eliminarRequisitoDocumento(id: ID!): Boolean!
+  toggleActivoRequisitoDocumento(id: ID!): RequisitoDocumento!
   reordenarRequisitos(checklistId: String!, requisitos: [RequisitoOrdenInput]!): Boolean!
   crearMultiplesRequisitos(requisitos: [RequisitoDocumentoInput!]!): [RequisitoDocumento]!
   eliminarRequisitosPorChecklist(checklistId: String!): Boolean!
@@ -145,4 +147,13 @@ type Mutation {
 input RequisitoOrdenInput {
   id: ID!
   orden: Int!
+}
+
+# Input para la mutation inteligente
+input GuardarPlantillaChecklistInput {
+  id: ID
+  datosPlantilla: PlantillaChecklistInput!
+  requisitos: [RequisitoDocumentoInput!]!
+  requisitosActualizar: [RequisitoDocumentoUpdateInput!]!
+  requisitosDesactivar: [ID!]!
 }

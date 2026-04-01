@@ -12,9 +12,6 @@ export interface PlantillaChecklist {
     fechaCreacion: string
     fechaActualizacion?: string
   }
-  version: number
-  plantillaBaseId: string
-  vigente: boolean
   activo: boolean
   fechaCreacion: string
   fechaActualizacion?: string
@@ -26,9 +23,6 @@ export interface PlantillaChecklistInput {
   nombre: string
   descripcion?: string
   categoriaChecklistId: string
-  version: number
-  plantillaBaseId: string
-  vigente: boolean
   activo: boolean
 }
 
@@ -37,7 +31,6 @@ export interface PlantillaChecklistFiltros {
   nombre?: string
   categoriaChecklistId?: string
   activo?: boolean
-  vigente?: boolean
   categoriaTipoUso?: 'pago' | 'documentos_oc'
 }
 
@@ -55,6 +48,7 @@ export interface RequisitoDocumento {
   obligatorio: boolean
   formatosPermitidos?: string
   orden: number
+  activo: boolean
   plantillaDocumento?: {
     id: string
     nombrePlantilla: string
@@ -81,6 +75,7 @@ export interface RequisitoDocumentoInput {
   obligatorio: boolean
   formatosPermitidos?: string
   orden: number
+  activo?: boolean
 }
 
 export interface RequisitoDocumentoFiltros {
@@ -89,4 +84,5 @@ export interface RequisitoDocumentoFiltros {
   obligatorio?: boolean
   plantillaDocumentoId?: string
   formularioId?: string
+  activo?: boolean
 }

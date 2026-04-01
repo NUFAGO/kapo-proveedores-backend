@@ -12,6 +12,10 @@ import { CategoriaChecklistResolver } from './CategoriaChecklistResolver';
 import { PlantillaDocumentoResolver } from './PlantillaDocumentoResolver';
 import { PlantillaChecklistResolver } from './PlantillaChecklistResolver';
 import { UploadResolver } from './UploadResolver';
+import { OrdenCompraResolver } from './OrdenCompraResolver';
+import { ExpedientePagoResolver } from './ExpedientePagoResolver';
+import { TipoPagoOCResolver } from './TipoPagoOCResolver';
+import { DocumentoOCResolver } from './DocumentoOCResolver';
 import { Container } from '../../di/Container';
 import { AuthService } from '../../../aplicacion/servicios/AuthService';
 import { AuthAdminService } from '../../../aplicacion/servicios/AuthAdminService';
@@ -22,12 +26,19 @@ import { CategoriaChecklistService } from '../../../dominio/servicios/CategoriaC
 import { PlantillaDocumentoService } from '../../../dominio/servicios/PlantillaDocumentoService';
 import { PlantillaChecklistService } from '../../../dominio/servicios/PlantillaChecklistService';
 import { RequisitoDocumentoService } from '../../../dominio/servicios/RequisitoDocumentoService';
+import { OrdenCompraService } from '../../../aplicacion/servicios/OrdenCompraService';
+import { ExpedientePagoService } from '../../../dominio/servicios/ExpedientePagoService';
+import { TipoPagoOCService } from '../../../dominio/servicios/TipoPagoOCService';
+import { DocumentoOCService } from '../../../dominio/servicios/DocumentoOCService';
 import { UsuarioProveedorMongoRepository } from '../../persistencia/mongo/UsuarioProveedorMongoRepository';
 import { TipoDocumentoMongoRepository } from '../../persistencia/mongo/TipoDocumentoMongoRepository';
 import { CategoriaChecklistMongoRepository } from '../../persistencia/mongo/CategoriaChecklistMongoRepository';
 import { PlantillaDocumentoMongoRepository } from '../../persistencia/mongo/PlantillaDocumentoMongoRepository';
 import { PlantillaChecklistMongoRepository } from '../../persistencia/mongo/PlantillaChecklistMongoRepository';
 import { RequisitoDocumentoMongoRepository } from '../../persistencia/mongo/RequisitoDocumentoMongoRepository';
+import { DocumentoOCMongoRepository } from '../../persistencia/mongo/DocumentoOCMongoRepository';
+import { ExpedientePagoMongoRepository } from '../../persistencia/mongo/ExpedientePagoMongoRepository';
+import { TipoPagoOCMongoRepository } from '../../persistencia/mongo/TipoPagoOCMongoRepository';
 import { HttpAuthRepository } from '../../persistencia/http/HttpAuthRepository';
 // import { DynamicGuardSystem } from '../../auth/DynamicGuardSystem'; // Temporalmente desactivado
 import { logger } from '../../logging/Logger';
@@ -80,6 +91,37 @@ export class ResolverFactory {
     // Registrar RequisitoDocumentoMongoRepository
     container.register('RequisitoDocumentoMongoRepository', () => new RequisitoDocumentoMongoRepository(), true);
     
+    // Registrar DocumentoOCMongoRepository
+    container.register('DocumentoOCMongoRepository', () => new DocumentoOCMongoRepository(), true);
+    
+    // Registrar ExpedientePagoMongoRepository
+    container.register('ExpedientePagoMongoRepository', () => new ExpedientePagoMongoRepository(), true);
+    
+    // Registrar TipoPagoOCMongoRepository
+    container.register('TipoPagoOCMongoRepository', () => new TipoPagoOCMongoRepository(), true);
+    
+    // Registrar ExpedientePagoService
+    container.register('ExpedientePagoService', (c: any) => {
+      const expedienteRepo = c.resolve('ExpedientePagoMongoRepository');
+      const tipoPagoOCRepo = c.resolve('TipoPagoOCMongoRepository');
+      const documentoOCRepo = c.resolve('DocumentoOCMongoRepository');
+      return new ExpedientePagoService(expedienteRepo, tipoPagoOCRepo, documentoOCRepo);
+    }, true);
+    
+    // Registrar TipoPagoOCService
+    container.register('TipoPagoOCService', (c: any) => {
+      const tipoPagoOCRepo = c.resolve('TipoPagoOCMongoRepository');
+      const expedienteRepo = c.resolve('ExpedientePagoMongoRepository');
+      return new TipoPagoOCService(tipoPagoOCRepo, expedienteRepo);
+    }, true);
+    
+    // Registrar DocumentoOCService
+    container.register('DocumentoOCService', (c: any) => {
+      const documentoOCRepo = c.resolve('DocumentoOCMongoRepository');
+      const expedienteRepo = c.resolve('ExpedientePagoMongoRepository');
+      return new DocumentoOCService(documentoOCRepo, expedienteRepo);
+    }, true);
+    
     // Registrar AuthService (usa HttpAuthRepository)
     container.register('AuthService', (c: any) => {
       const httpAuthRepo = c.resolve('HttpAuthRepository');
@@ -122,11 +164,12 @@ export class ResolverFactory {
       return new PlantillaDocumentoService(plantillaDocumentoRepo);
     }, true);
     
-    // Registrar PlantillaChecklistService (usa PlantillaChecklistMongoRepository y CategoriaChecklistService)
+    // Registrar PlantillaChecklistService (usa PlantillaChecklistMongoRepository, CategoriaChecklistService y RequisitoDocumentoMongoRepository)
     container.register('PlantillaChecklistService', (c: any) => {
       const plantillaRepo = c.resolve('PlantillaChecklistMongoRepository');
       const categoriaService = c.resolve('CategoriaChecklistService');
-      return new PlantillaChecklistService(plantillaRepo, categoriaService);
+      const requisitoRepo = c.resolve('RequisitoDocumentoMongoRepository');
+      return new PlantillaChecklistService(plantillaRepo, categoriaService, requisitoRepo);
     }, true);
     
     // Registrar RequisitoDocumentoService (usa RequisitoDocumentoMongoRepository y PlantillaDocumentoService)
@@ -188,7 +231,34 @@ export class ResolverFactory {
     // Registrar UploadResolver
     container.register('UploadResolver', () => new UploadResolver(), true);
     
-    logger.info('Container inicializado con dependencias de autenticación, usuarios proveedor, tipos de documento, categorias checklist, plantillas de documento y upload');
+    // Registrar OrdenCompraService
+    container.register('OrdenCompraService', () => new OrdenCompraService(), true);
+    
+    // Registrar OrdenCompraResolver
+    container.register('OrdenCompraResolver', (c: any) => {
+      const ordenCompraService = c.resolve('OrdenCompraService');
+      return new OrdenCompraResolver(ordenCompraService);
+    }, true);
+    
+    // Registrar ExpedientePagoResolver
+    container.register('ExpedientePagoResolver', (c: any) => {
+      const expedientePagoService = c.resolve('ExpedientePagoService');
+      return new ExpedientePagoResolver(expedientePagoService);
+    }, true);
+    
+    // Registrar TipoPagoOCResolver
+    container.register('TipoPagoOCResolver', (c: any) => {
+      const tipoPagoOCService = c.resolve('TipoPagoOCService');
+      return new TipoPagoOCResolver(tipoPagoOCService);
+    }, true);
+    
+    // Registrar DocumentoOCResolver
+    container.register('DocumentoOCResolver', (c: any) => {
+      const documentoOCService = c.resolve('DocumentoOCService');
+      return new DocumentoOCResolver(documentoOCService);
+    }, true);
+    
+    logger.info('Container inicializado con dependencias de autenticación, usuarios proveedor, tipos de documento, categorias checklist, plantillas de documento, upload, ordenes de compra, expedientes pago, tipos pago OC, documentos OC y sus repositories MongoDB');
   }
 
   /**
@@ -244,6 +314,26 @@ export class ResolverFactory {
       const uploadResolver = container.resolve<UploadResolver>('UploadResolver');
       resolvers.push(uploadResolver.getResolvers());
       logger.debug('Resolver configurado: upload');
+      
+      // Crear OrdenCompraResolver
+      const ordenCompraResolver = container.resolve<OrdenCompraResolver>('OrdenCompraResolver');
+      resolvers.push(ordenCompraResolver.getResolvers());
+      logger.debug('Resolver configurado: ordenCompra');
+      
+      // Crear ExpedientePagoResolver
+      const expedientePagoResolver = container.resolve<ExpedientePagoResolver>('ExpedientePagoResolver');
+      resolvers.push(expedientePagoResolver.getResolvers());
+      logger.debug('Resolver configurado: expedientePago');
+      
+      // Crear TipoPagoOCResolver
+      const tipoPagoOCResolver = container.resolve<TipoPagoOCResolver>('TipoPagoOCResolver');
+      resolvers.push(tipoPagoOCResolver.getResolvers());
+      logger.debug('Resolver configurado: tipoPagoOC');
+      
+      // Crear DocumentoOCResolver
+      const documentoOCResolver = container.resolve<DocumentoOCResolver>('DocumentoOCResolver');
+      resolvers.push(documentoOCResolver.getResolvers());
+      logger.debug('Resolver configurado: documentoOC');
       
       // TODO: Activar guardias dinámicas después de resolver el problema
       // const resolversConGuardias = DynamicGuardSystem.processResolvers(resolvers);

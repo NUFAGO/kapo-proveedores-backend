@@ -1,0 +1,186 @@
+# Tipos de entrada para ExpedientePago
+input ExpedientePagoInput {
+  ocId: String!
+  ocCodigo: String!
+  ocSnapshot: JSON!
+  proveedorId: String!
+  proveedorNombre: String!
+  montoContrato: Float!
+  fechaInicioContrato: DateTime!
+  fechaFinContrato: DateTime!
+  descripcion: String!
+  requiereReportes: Boolean = false
+  frecuenciaReporte: String
+  minReportesPorSolicitud: Int
+  modoValidacionReportes: String
+  adminCreadorId: String!
+}
+
+input ExpedientePagoFilter {
+  page: Int = 1
+  limit: Int = 10
+  ocId: String
+  proveedorId: String
+  estado: String
+  adminCreadorId: String
+  searchTerm: String
+}
+
+input UpdateExpedientePagoInput {
+  ocId: String
+  ocCodigo: String
+  ocSnapshot: JSON
+  proveedorId: String
+  proveedorNombre: String
+  montoContrato: Float
+  fechaInicioContrato: DateTime
+  fechaFinContrato: DateTime
+  descripcion: String
+  requiereReportes: Boolean
+  frecuenciaReporte: String
+  minReportesPorSolicitud: Int
+  modoValidacionReportes: String
+}
+
+# Tipos de entrada para configuración de expediente
+input TipoPagoConfigInput {
+  categoriaChecklistId: String!
+  checklistId: String!
+  modoRestriccion: String!
+  orden: Int
+  requiereAnteriorPagado: Boolean
+  porcentajeMaximo: Float
+  porcentajeMinimo: Float
+}
+
+input ConfigurarExpedienteInput {
+  expedienteId: String!
+  documentosBaseIds: [String!]!
+  tiposPago: [TipoPagoConfigInput!]!
+}
+
+# Tipo principal ExpedientePago
+type ExpedientePago {
+  id: ID!
+  ocId: String!
+  ocCodigo: String!
+  ocSnapshot: JSON!
+  fechaSnapshot: DateTime!
+  proveedorId: String!
+  proveedorNombre: String!
+  montoContrato: Float!
+  fechaInicioContrato: DateTime!
+  fechaFinContrato: DateTime!
+  descripcion: String!
+  estado: String!
+  montoComprometido: Float!
+  montoPagado: Float!
+  montoDisponible: Float!
+  requiereReportes: Boolean!
+  frecuenciaReporte: String
+  minReportesPorSolicitud: Int
+  modoValidacionReportes: String
+  adminCreadorId: String!
+  fechaCreacion: DateTime!
+  fechaConfigurado: DateTime
+}
+
+# Respuesta paginada para ExpedientePago
+type ExpedientePagoConnection {
+  data: [ExpedientePago!]!
+  total: Int!
+  page: Int!
+  limit: Int!
+  totalPages: Int!
+}
+
+# Tipo completo de ExpedientePago con relaciones
+type ExpedientePagoCompleto {
+  id: ID!
+  ordenCompraId: String!
+  codigo: String!
+  proveedorId: String!
+  proveedorNombre: String!
+  montoContrato: Float!
+  montoDisponible: Float!
+  montoComprometido: Float!
+  montoPagado: Float!
+  estado: String!
+  fechaInicio: DateTime!
+  fechaFin: DateTime!
+  descripcion: String!
+  adminCreadorId: String!
+  fechaCreacion: DateTime!
+  fechaConfigurado: DateTime
+  tiposPago: [TipoPagoOC!]!
+  documentos: [DocumentoOC!]!
+}
+
+# Queries para ExpedientePago
+extend type Query {
+  # Obtener un expediente por ID
+  obtenerExpedientePago(id: ID!): ExpedientePago
+  
+  # Listar expedientes con paginación y filtros
+  listarExpedientesPago(filter: ExpedientePagoFilter): ExpedientePagoConnection
+  
+  # Obtener expediente por OC ID
+  obtenerExpedientePorOcId(ocId: String!): ExpedientePago
+  
+  # Obtener expediente completo con todas sus relaciones y archivos
+  obtenerExpedienteCompleto(id: ID!): ExpedientePagoCompleto
+  
+  # Obtener expedientes por proveedor
+  obtenerExpedientesPorProveedor(proveedorId: String!, filter: ExpedientePagoFilter): [ExpedientePago!]!
+}
+
+# Input para guardar expediente con items seleccionados
+input GuardarExpedienteItemsInput {
+  ocData: OrdenCompraData!
+  adminCreadorId: String!
+  solicitudesPago: [ExpedienteItemInput!]!
+  documentosOC: [ExpedienteItemInput!]!
+}
+
+# Datos de la orden de compra
+input OrdenCompraData {
+  id: String!
+  codigo: String!
+  proveedorId: String!
+  proveedorNombre: String!
+  montoContrato: Float!
+  fechaInicioContrato: DateTime!
+  fechaFinContrato: DateTime!
+  descripcion: String
+}
+
+# Input para items del expediente
+input ExpedienteItemInput {
+  categoriaChecklistId: String!
+  plantillaChecklistId: String!
+}
+
+# Mutations para ExpedientePago
+extend type Mutation {
+  # Crear un nuevo expediente
+  crearExpedientePago(input: ExpedientePagoInput!): ExpedientePago
+  
+  # Configurar un expediente (documentos base y tipos de pago)
+  configurarExpediente(input: ConfigurarExpedienteInput!): ExpedientePago
+  
+  # Guardar expediente con items seleccionados (crea expediente, documentos y tipos de pago)
+  guardarExpedienteConItems(input: GuardarExpedienteItemsInput!): ExpedientePago
+  
+  # Actualizar estado de un expediente
+  actualizarEstadoExpediente(id: ID!, estado: String!): ExpedientePago
+  
+  # Actualizar saldos de un expediente
+  actualizarSaldosExpediente(
+    id: ID!
+    montoComprometido: Float!
+    montoPagado: Float!
+  ): ExpedientePago
+  
+  # Eliminar un expediente
+  eliminarExpedientePago(id: ID!): Boolean
+}

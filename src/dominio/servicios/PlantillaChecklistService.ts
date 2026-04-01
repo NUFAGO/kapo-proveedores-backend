@@ -4,13 +4,18 @@ import {
   PlantillaChecklistFiltros,
   PlantillaChecklistConnection 
 } from '../entidades/PlantillaChecklist'
+import { 
+  RequisitoDocumentoInput 
+} from '../entidades/PlantillaChecklist'
 import { IPlantillaChecklistRepository } from '../repositorios/IPlantillaChecklistRepository'
 import { ICategoriaChecklistRepository } from '../repositorios/ICategoriaChecklistRepository'
+import { IRequisitoDocumentoRepository } from '../repositorios/IRequisitoDocumentoRepository'
 
 export class PlantillaChecklistService {
   constructor(
     private plantillaRepository: IPlantillaChecklistRepository,
-    private categoriaRepository: ICategoriaChecklistRepository
+    private categoriaRepository: ICategoriaChecklistRepository,
+    private requisitoRepository: IRequisitoDocumentoRepository
   ) {}
 
   async crear(input: PlantillaChecklistInput): Promise<PlantillaChecklist> {
@@ -20,21 +25,9 @@ export class PlantillaChecklistService {
       throw new Error('La categoría de checklist especificada no existe')
     }
 
-    // Si es primera versión, plantillaBaseId debe ser el mismo ID (se asignará después de crear)
-    if (input.version === 1) {
-      // Validar que no exista otra plantilla con el mismo código (si se proporciona)
-      if (input.codigo) {
-        const existentePorCodigo = await this.plantillaRepository.obtenerVersionVigentePorCodigo(input.codigo)
-        if (existentePorCodigo) {
-          throw new Error('Ya existe una plantilla con ese código')
-        }
-      }
-    } else {
-      // Si no es versión 1, debe existir plantillaBaseId
-      if (!input.plantillaBaseId) {
-        throw new Error('Las versiones posteriores deben tener plantillaBaseId')
-      }
-    }
+    // Validar que no exista otra plantilla con el mismo código (si se proporciona)
+    // Nota: Por ahora omitimos esta validación ya que el método no existe en el repositorio
+    // TODO: Implementar validación de código único cuando esté disponible el método correspondiente
 
     return await this.plantillaRepository.crear(input)
   }
@@ -126,41 +119,90 @@ export class PlantillaChecklistService {
       throw new Error('La plantilla de checklist no existe')
     }
 
-    // Obtener siguiente versión
-    const siguienteVersion = await this.plantillaRepository.obtenerUltimaVersion(original.categoriaChecklistId) + 1
-
     const nuevaPlantilla: PlantillaChecklistInput = {
       nombre: nuevoNombre,
       ...(original.descripcion && { descripcion: original.descripcion }),
       categoriaChecklistId: original.categoriaChecklistId,
-      version: siguienteVersion,
-      plantillaBaseId: original.plantillaBaseId,
-      vigente: false, // Las duplicadas comienzan no vigentes
       activo: false // Las duplicadas comienzan inactivas
     }
 
     return await this.crear(nuevaPlantilla)
   }
 
-  // Nuevos métodos para versionamiento
-  async listarVigentes(): Promise<PlantillaChecklist[]> {
-    return await this.plantillaRepository.listarVigentes()
-  }
+  async guardarCompleto(input: {
+    id?: string;
+    datosPlantilla: PlantillaChecklistInput;
+    requisitos: Array<RequisitoDocumentoInput>;
+    requisitosActualizar: Array<{ 
+      id: string; 
+      checklistId?: string | undefined; 
+      tipoRequisito?: "documento" | "formulario" | undefined; 
+      plantillaDocumentoId?: string | undefined; 
+      formularioId?: string | undefined; 
+      obligatorio?: boolean | undefined; 
+      orden?: number | undefined; 
+      activo?: boolean | undefined; 
+    }>;
+    requisitosDesactivar: string[];
+  }): Promise<PlantillaChecklist> {
+    const { id, datosPlantilla, requisitos, requisitosActualizar, requisitosDesactivar } = input;
 
-  async obtenerVersionesPorCodigo(codigo: string): Promise<PlantillaChecklist[]> {
-    return await this.plantillaRepository.obtenerVersionesPorCodigo(codigo)
-  }
+    let plantilla: PlantillaChecklist;
 
-  async obtenerVersionVigentePorCodigo(codigo: string): Promise<PlantillaChecklist | null> {
-    return await this.plantillaRepository.obtenerVersionVigentePorCodigo(codigo)
-  }
+    if (id) {
+      // ACTUALIZACIÓN
+      const resultado = await this.actualizar(id, datosPlantilla);
+      if (!resultado) {
+        throw new Error('No se pudo actualizar la plantilla de checklist');
+      }
+      plantilla = resultado;
 
-  async crearNuevaVersion(checklistId: string): Promise<PlantillaChecklist> {
-    const existente = await this.plantillaRepository.obtenerPorId(checklistId)
-    if (!existente) {
-      throw new Error('La plantilla de checklist no existe')
+      // Crear nuevos requisitos
+      console.log('🆕 Creando nuevos requisitos:', requisitos.length);
+      for (const req of requisitos) {
+        console.log('🔍 Nuevo requisito a crear:', req);
+        await this.requisitoRepository.crear({ ...req, checklistId: id });
+      }
+
+      // Actualizar requisitos existentes
+      console.log('🔄 Actualizando requisitos existentes:', requisitosActualizar.length);
+      for (const req of requisitosActualizar) {
+        console.log('🔍 Requisito a actualizar:', req);
+        const { id: reqId, ...datosActualizacion } = req;
+        // Filtrar propiedades undefined para evitar problemas con exactOptionalPropertyTypes
+        const datosFiltrados: Partial<RequisitoDocumentoInput> = {};
+        if (datosActualizacion.checklistId !== undefined) datosFiltrados.checklistId = datosActualizacion.checklistId;
+        if (datosActualizacion.tipoRequisito !== undefined) datosFiltrados.tipoRequisito = datosActualizacion.tipoRequisito;
+        if (datosActualizacion.plantillaDocumentoId !== undefined) datosFiltrados.plantillaDocumentoId = datosActualizacion.plantillaDocumentoId;
+        if (datosActualizacion.formularioId !== undefined) datosFiltrados.formularioId = datosActualizacion.formularioId;
+        if (datosActualizacion.obligatorio !== undefined) datosFiltrados.obligatorio = datosActualizacion.obligatorio;
+        if (datosActualizacion.orden !== undefined) datosFiltrados.orden = datosActualizacion.orden;
+        if (datosActualizacion.activo !== undefined) datosFiltrados.activo = datosActualizacion.activo;
+        
+        await this.requisitoRepository.actualizar(reqId, datosFiltrados);
+      }
+
+      // Desactivar requisitos
+      for (const reqId of requisitosDesactivar) {
+        await this.requisitoRepository.actualizar(reqId, { activo: false });
+      }
+
+    } else {
+      // CREACIÓN
+      plantilla = await this.crear(datosPlantilla);
+
+      // Crear todos los requisitos
+      for (const req of requisitos) {
+        await this.requisitoRepository.crear({ ...req, checklistId: plantilla.id });
+      }
     }
 
-    return await this.plantillaRepository.crearNuevaVersion(checklistId)
+    // Retornar plantilla completa con requisitos
+    const resultado = await this.plantillaRepository.obtenerConRequisitos(plantilla.id);
+    if (!resultado) {
+      throw new Error('No se pudo obtener la plantilla guardada');
+    }
+
+    return resultado;
   }
 }

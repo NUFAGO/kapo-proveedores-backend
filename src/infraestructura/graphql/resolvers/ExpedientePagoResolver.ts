@@ -94,9 +94,9 @@ export class ExpedientePagoResolver {
         }),
         
         // Listar expedientes de pago con filtros y paginación
-        listarExpedientesPago: adminGuard(async (_: any, args: ExpedientePagoFilter) => {
+        listarExpedientesPago: adminGuard(async (_: any, args: { filter?: ExpedientePagoFilter }) => {
           return await ErrorHandler.handleError(
-            async () => await this.servicio.listarExpedientesPago(args),
+            async () => await this.servicio.listarExpedientesPago(args.filter || {}),
             'listarExpedientesPago'
           );
         }),

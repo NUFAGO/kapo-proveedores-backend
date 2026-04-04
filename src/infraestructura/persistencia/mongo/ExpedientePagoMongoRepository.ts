@@ -100,6 +100,7 @@ export class ExpedientePagoMongoRepository implements IExpedientePagoRepository 
     const query: any = {};
     
     if (filters.ocId) query.ordenCompraId = filters.ocId;
+    if (filters.ocCodigo) query.codigo = filters.ocCodigo;
     if (filters.proveedorId) query.proveedorId = filters.proveedorId;
     if (filters.estado) query.estado = filters.estado;
     if (filters.adminCreadorId) query.adminCreadorId = filters.adminCreadorId;

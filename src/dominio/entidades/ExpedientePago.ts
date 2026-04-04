@@ -44,6 +44,7 @@ export interface ExpedientePagoFilter {
   page?: number;
   limit?: number;
   ocId?: string;
+  ocCodigo?: string;
   proveedorId?: string;
   estado?: string;
   adminCreadorId?: string;

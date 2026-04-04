@@ -105,7 +105,9 @@ export class ResolverFactory {
       const expedienteRepo = c.resolve('ExpedientePagoMongoRepository');
       const tipoPagoOCRepo = c.resolve('TipoPagoOCMongoRepository');
       const documentoOCRepo = c.resolve('DocumentoOCMongoRepository');
-      return new ExpedientePagoService(expedienteRepo, tipoPagoOCRepo, documentoOCRepo);
+      const categoriaRepo = c.resolve('CategoriaChecklistMongoRepository');
+      const plantillaRepo = c.resolve('PlantillaChecklistMongoRepository');
+      return new ExpedientePagoService(expedienteRepo, tipoPagoOCRepo, documentoOCRepo, categoriaRepo, plantillaRepo);
     }, true);
     
     // Registrar TipoPagoOCService

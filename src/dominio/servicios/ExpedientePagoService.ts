@@ -3,13 +3,77 @@ import { TipoPagoOC } from '../entidades/TipoPagoOC';
 import { IExpedientePagoRepository } from '../repositorios/IExpedientePagoRepository';
 import { ITipoPagoOCRepository } from '../repositorios/ITipoPagoOCRepository';
 import { IDocumentoOCRepository } from '../repositorios/IDocumentoOCRepository';
+import { ICategoriaChecklistRepository } from '../repositorios/ICategoriaChecklistRepository';
+import { IPlantillaChecklistRepository } from '../repositorios/IPlantillaChecklistRepository';
+import { BaseHttpRepository } from '../../infraestructura/persistencia/http/BaseHttpRepository';
+import { logger } from '../../infraestructura/logging';
+
+class MonolithHttpRepository extends BaseHttpRepository<any> {
+  async list(): Promise<any[]> {
+    return [];
+  }
+
+  protected getDefaultSearchFields(): string[] {
+    return [];
+  }
+
+  // Expose the protected graphqlRequest method for use in ExpedientePagoService
+  async callGraphQLRequest(query: string, variables: any = {}, serviceName: string = '', fallbackServiceName: string = 'inacons-backend'): Promise<any> {
+    return this.graphqlRequest(query, variables, serviceName, fallbackServiceName);
+  }
+}
 
 export class ExpedientePagoService {
+  private httpRepository: MonolithHttpRepository;
+
   constructor(
     private readonly expedienteRepository: IExpedientePagoRepository,
     private readonly tipoPagoOCRepository: ITipoPagoOCRepository,
-    private readonly documentoOCRepository: IDocumentoOCRepository
-  ) {}
+    private readonly documentoOCRepository: IDocumentoOCRepository,
+    private readonly categoriaRepository: ICategoriaChecklistRepository,
+    private readonly plantillaRepository: IPlantillaChecklistRepository
+  ) {
+    this.httpRepository = new MonolithHttpRepository();
+  }
+
+  /**
+   * Actualizar el estado de tiene_expediente en el monolito
+   */
+  private async actualizarEstadoExpedienteEnMonolito(ocId: string, tieneExpediente: boolean): Promise<void> {
+    try {
+      logger.info(`Actualizando estado de expediente en monolito para OC ${ocId} a ${tieneExpediente}`);
+      
+      const mutation = `
+        mutation ActualizarEstadoExpediente($ordenCompraId: ID!, $tieneExpediente: Boolean!) {
+          actualizarEstadoExpediente(ordenCompraId: $ordenCompraId, tieneExpediente: $tieneExpediente) {
+            success
+            message
+          }
+        }
+      `;
+
+      const result = await this.httpRepository.callGraphQLRequest(
+        mutation,
+        { ordenCompraId: ocId, tieneExpediente },
+        'inacons-backend'
+      );
+
+      if (result?.actualizarEstadoExpediente?.success) {
+        logger.info(`Estado de expediente actualizado exitosamente en monolito para OC ${ocId}`);
+      } else {
+        throw new Error('No se pudo actualizar el estado de expediente en el monolito');
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      
+      // MODO ESTRICTO: CUALQUIER error del monolito causa rollback
+      if (errorMessage.includes('Cannot query field') || errorMessage.includes('actualizarEstadoExpediente')) {
+        throw new Error(`La mutación actualizarEstadoExpediente no está disponible en el monolito. El monolito necesita reiniciarse para poder crear expedientes.`);
+      }
+      
+      throw new Error(`Error crítico al actualizar estado de expediente en monolito: ${errorMessage}`);
+    }
+  }
 
   /**
    * Crear un nuevo expediente de pago desde una OC
@@ -42,7 +106,32 @@ export class ExpedientePagoService {
       fechaCreacion: new Date()
     };
 
-    return await this.expedienteRepository.create(expediente);
+    let nuevoExpediente: ExpedientePago | undefined;
+
+    try {
+      // 1. Crear el expediente
+      nuevoExpediente = await this.expedienteRepository.create(expediente);
+
+      // 2. Actualizar el estado de tiene_expediente en el monolito
+      await this.actualizarEstadoExpedienteEnMonolito(input.ocId, true);
+
+      // 3. Si todo fue exitoso, retornar el expediente
+      return nuevoExpediente;
+    } catch (error) {
+      // 4. Si falló la actualización en el monolito, hacer rollback: eliminar el expediente creado
+      if (nuevoExpediente && nuevoExpediente.id) {
+        try {
+          await this.expedienteRepository.delete(nuevoExpediente.id);
+          logger.warn(`Rollback: Expediente ${nuevoExpediente.id} eliminado debido a fallo en monolito`);
+        } catch (rollbackError) {
+          const rollbackErrorMessage = rollbackError instanceof Error ? rollbackError.message : String(rollbackError);
+          logger.error(`Error crítico: No se pudo hacer rollback del expediente ${nuevoExpediente.id}:`, { error: rollbackErrorMessage });
+        }
+      }
+      
+      // 5. Lanzar el error original para que el cliente sepa que falló
+      throw error;
+    }
   }
 
   /**
@@ -230,7 +319,14 @@ export class ExpedientePagoService {
       throw new Error('Solo se pueden eliminar expedientes en estado "en_configuracion"');
     }
 
-    return await this.expedienteRepository.delete(id);
+    const resultado = await this.expedienteRepository.delete(id);
+    
+    // Si se eliminó exitosamente, actualizar el estado en el monolito
+    if (resultado) {
+      await this.actualizarEstadoExpedienteEnMonolito(expediente.ocId, false);
+    }
+    
+    return resultado;
   }
 
   /**
@@ -257,12 +353,6 @@ export class ExpedientePagoService {
       plantillaChecklistId: string;
     }>
   ): Promise<ExpedientePago> {
-    // 1. Validar que no exista un expediente para esta OC
-    const existeExpediente = await this.expedienteRepository.existsExpedienteForOc(ocData.id);
-    if (existeExpediente) {
-      throw new Error('Ya existe un expediente para esta orden de compra');
-    }
-
     // 2. Crear el expediente con los datos proporcionados
     const expedienteInput: ExpedientePagoInput = {
       ocId: ocData.id,
@@ -297,34 +387,96 @@ export class ExpedientePagoService {
       adminCreadorId: expedienteInput.adminCreadorId
     };
 
-    const expediente = await this.expedienteRepository.create(expedienteMongoData);
+    let expediente: ExpedientePago | undefined;
+    let tiposPagoCreados: any[] = [];
+    let documentosCreados: any[] = [];
 
-    // 3. Crear los tipos de pago (solicitudes de pago)
-    for (const [index, solicitud] of solicitudesPago.entries()) {
-      const tipoPagoInput = {
-        expedienteId: expediente.id,
-        categoriaChecklistId: solicitud.categoriaChecklistId,
-        checklistId: solicitud.plantillaChecklistId,
-        modoRestriccion: 'libre' as const,
-        orden: index + 1
-      };
-      await this.tipoPagoOCRepository.create(tipoPagoInput);
+    try {
+      // 1. Validar que no exista un expediente para esta OC
+      const existeExpediente = await this.expedienteRepository.existsExpedienteForOc(ocData.id);
+      if (existeExpediente) {
+        throw new Error('Ya existe un expediente para esta orden de compra');
+      }
+
+      // 2. Crear el expediente
+      expediente = await this.expedienteRepository.create(expedienteMongoData);
+
+      // 3. Crear los tipos de pago (solicitudes de pago)
+      for (const [index, solicitud] of solicitudesPago.entries()) {
+        const tipoPagoInput = {
+          expedienteId: expediente.id,
+          categoriaChecklistId: solicitud.categoriaChecklistId,
+          checklistId: solicitud.plantillaChecklistId,
+          modoRestriccion: 'libre' as const,
+          orden: index + 1
+        };
+        const tipoPagoCreado = await this.tipoPagoOCRepository.create(tipoPagoInput);
+        tiposPagoCreados.push(tipoPagoCreado);
+      }
+
+      // 4. Crear los documentos OC
+      for (const documento of documentosOC) {
+        const documentoInput = {
+          expedienteId: expediente.id,
+          checklistId: documento.plantillaChecklistId,
+          obligatorio: true
+        };
+        const documentoCreado = await this.documentoOCRepository.create(documentoInput);
+        documentosCreados.push(documentoCreado);
+      }
+
+      // 5. Actualizar estado del expediente a configurado
+      const expedienteActualizado = await this.actualizarEstado(expediente.id, 'configurado');
+      
+      // 6. Actualizar el estado de tiene_expediente en el monolito
+      await this.actualizarEstadoExpedienteEnMonolito(ocData.id, true);
+      
+      return expedienteActualizado;
+    } catch (error) {
+      // 7. Si algo falló, hacer rollback completo (solo si se creó algo)
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      
+      // Solo hacer rollback si el error no es de "expediente ya existe"
+      if (!errorMessage.includes('Ya existe un expediente')) {
+        logger.error(`Error en guardarExpedienteConItems, iniciando rollback para OC ${ocData.id}:`, { error: errorMessage });
+        
+        // Eliminar documentos creados
+        for (const documento of documentosCreados) {
+          try {
+            await this.documentoOCRepository.delete(documento.id);
+          } catch (rollbackError) {
+            const rollbackErrorMessage = rollbackError instanceof Error ? rollbackError.message : String(rollbackError);
+            logger.error(`Error eliminando documento ${documento.id} en rollback:`, { error: rollbackErrorMessage });
+          }
+        }
+
+        // Eliminar tipos de pago creados
+        for (const tipoPago of tiposPagoCreados) {
+          try {
+            await this.tipoPagoOCRepository.delete(tipoPago.id);
+          } catch (rollbackError) {
+            const rollbackErrorMessage = rollbackError instanceof Error ? rollbackError.message : String(rollbackError);
+            logger.error(`Error eliminando tipo pago ${tipoPago.id} en rollback:`, { error: rollbackErrorMessage });
+          }
+        }
+
+        // Eliminar el expediente creado
+        if (expediente && expediente.id) {
+          try {
+            await this.expedienteRepository.delete(expediente.id);
+            logger.warn(`Rollback: Expediente ${expediente.id} eliminado debido a fallo en guardarExpedienteConItems`);
+          } catch (rollbackError) {
+            const rollbackErrorMessage = rollbackError instanceof Error ? rollbackError.message : String(rollbackError);
+            logger.error(`Error crítico: No se pudo eliminar el expediente ${expediente.id} en rollback:`, { error: rollbackErrorMessage });
+          }
+        }
+      } else {
+        logger.warn(`No se hace rollback porque el error es de expediente duplicado para OC ${ocData.id}`);
+      }
+      
+      // Lanzar el error original
+      throw error;
     }
-
-    // 4. Crear los documentos OC
-    for (const documento of documentosOC) {
-      const documentoInput = {
-        expedienteId: expediente.id,
-        checklistId: documento.plantillaChecklistId,
-        obligatorio: true
-      };
-      await this.documentoOCRepository.create(documentoInput);
-    }
-
-    // 5. Actualizar estado del expediente a configurado
-    const expedienteActualizado = await this.actualizarEstado(expediente.id, 'configurado');
-    
-    return expedienteActualizado;
   }
 
   /**
@@ -354,11 +506,38 @@ export class ExpedientePagoService {
     // Obtener documentos OC relacionados
     const documentos = await this.documentoOCRepository.findByExpedienteId(id);
 
-    // Para cada documento, obtener sus archivos
-    for (const documento of documentos) {
-      // TODO: Implementar método para obtener archivos por documentoOCId
-      // Por ahora, agregamos un array vacío de archivos
-      (documento as any).archivos = [];
+    // Recopilar IDs unicos de categorias y checklists para hacer lookups
+    const categoriaIds = new Set<string>();
+    const checklistIds = new Set<string>();
+
+    for (const tp of tiposPago) {
+      if (tp.categoriaChecklistId) categoriaIds.add(tp.categoriaChecklistId);
+      if (tp.checklistId) checklistIds.add(tp.checklistId);
+    }
+    for (const doc of documentos) {
+      if (doc.checklistId) checklistIds.add(doc.checklistId);
+    }
+
+    // Lookup real de categorias
+    const categoriasMap = new Map<string, any>();
+    for (const catId of categoriaIds) {
+      try {
+        const cat = await this.categoriaRepository.obtenerCategoriaChecklist(catId);
+        if (cat) categoriasMap.set(catId, cat);
+      } catch (e) {
+        logger.warn(`No se pudo obtener categoria ${catId}: ${e}`);
+      }
+    }
+
+    // Lookup real de plantillas/checklists
+    const checklistsMap = new Map<string, any>();
+    for (const clId of checklistIds) {
+      try {
+        const cl = await this.plantillaRepository.obtenerPorId(clId);
+        if (cl) checklistsMap.set(clId, cl);
+      } catch (e) {
+        logger.warn(`No se pudo obtener checklist ${clId}: ${e}`);
+      }
     }
 
     // Mapear al formato esperado por GraphQL
@@ -366,45 +545,13 @@ export class ExpedientePagoService {
       ...expediente,
       tiposPago: tiposPago.map(tp => ({
         ...tp,
-        categoria: tp.categoriaChecklistId ? { 
-          id: tp.categoriaChecklistId, 
-          nombre: 'Categoría', 
-          descripcion: 'Descripción',
-          codigo: 'CAT-001',
-          categoriaTipoUso: 'solicitud_pago',
-          activo: true
-        } : null,
-        checklist: tp.checklistId ? {
-          id: tp.checklistId,
-          nombre: 'Plantilla',
-          descripcion: 'Descripción',
-          codigo: 'PL-001',
-          categoriaChecklistId: tp.categoriaChecklistId,
-          activo: true,
-          vigente: true,
-          fechaActualizacion: new Date()
-        } : null
+        categoria: categoriasMap.get(tp.categoriaChecklistId) || null,
+        checklist: checklistsMap.get(tp.checklistId) || null
       })),
       documentos: documentos.map(doc => ({
         ...doc,
-        categoria: { 
-          id: 'cat-temp', 
-          nombre: 'Categoría', 
-          descripcion: 'Descripción',
-          codigo: 'CAT-001',
-          categoriaTipoUso: 'documento',
-          activo: true
-        },
-        checklist: {
-          id: doc.checklistId,
-          nombre: 'Plantilla',
-          descripcion: 'Descripción',
-          codigo: 'PL-001',
-          categoriaChecklistId: 'cat-temp',
-          activo: true,
-          vigente: true,
-          fechaActualizacion: new Date()
-        }
+        estado: doc.estado ? doc.estado.toUpperCase() : 'PENDIENTE',
+        checklist: checklistsMap.get(doc.checklistId) || null
       }))
     };
   }

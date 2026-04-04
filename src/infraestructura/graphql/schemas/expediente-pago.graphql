@@ -20,6 +20,7 @@ input ExpedientePagoFilter {
   page: Int = 1
   limit: Int = 10
   ocId: String
+  ocCodigo: String
   proveedorId: String
   estado: String
   adminCreadorId: String
@@ -97,8 +98,8 @@ type ExpedientePagoConnection {
 # Tipo completo de ExpedientePago con relaciones
 type ExpedientePagoCompleto {
   id: ID!
-  ordenCompraId: String!
-  codigo: String!
+  ocId: String!
+  ocCodigo: String!
   proveedorId: String!
   proveedorNombre: String!
   montoContrato: Float!
@@ -106,8 +107,8 @@ type ExpedientePagoCompleto {
   montoComprometido: Float!
   montoPagado: Float!
   estado: String!
-  fechaInicio: DateTime!
-  fechaFin: DateTime!
+  fechaInicioContrato: DateTime!
+  fechaFinContrato: DateTime!
   descripcion: String!
   adminCreadorId: String!
   fechaCreacion: DateTime!

@@ -1,4 +1,5 @@
 import { SolicitudPagoService } from '../../../dominio/servicios/SolicitudPagoService';
+import { ExpedientePagoService } from '../../../dominio/servicios/ExpedientePagoService';
 import { ISolicitudPagoRepository } from '../../../dominio/repositorios/ISolicitudPagoRepository';
 import { SolicitudPagoMongoRepository } from '../../persistencia/mongo/SolicitudPagoMongoRepository';
 import { ITipoPagoOCRepository } from '../../../dominio/repositorios/ITipoPagoOCRepository';
@@ -25,35 +26,54 @@ interface ListSolicitudPagoArgs {
     expedienteId?: string;
     tipoPagoOCId?: string;
     estado?: string;
-    adminRevisorId?: string;
     fechaCreacionDesde?: string;
     fechaCreacionHasta?: string;
   };
 }
 
-interface UpdateEstadoSolicitudArgs {
-  id: string;
-  adminRevisorId: string;
-  comentarios?: string;
+interface AprobarSolicitudPagoArgs {
+  input: { id: string };
+}
+
+interface ObservarSolicitudPagoArgs {
+  input: { id: string; comentarios: string };
+}
+
+interface RechazarSolicitudPagoArgs {
+  input: { id: string; comentarios: string };
 }
 
 export class SolicitudPagoResolver {
   private servicio: SolicitudPagoService;
 
   constructor(
-    tipoPagoOCRepository: ITipoPagoOCRepository,
-    expedientePagoRepository: IExpedientePagoRepository
+    private readonly tipoPagoOCRepository: ITipoPagoOCRepository,
+    private readonly expedientePagoRepository: IExpedientePagoRepository,
+    expedientePagoService: ExpedientePagoService
   ) {
     const solicitudPagoRepository: ISolicitudPagoRepository = new SolicitudPagoMongoRepository();
     this.servicio = new SolicitudPagoService(
       solicitudPagoRepository,
       tipoPagoOCRepository,
-      expedientePagoRepository
+      expedientePagoRepository,
+      expedientePagoService
     );
   }
 
   getResolvers() {
     return {
+      SolicitudPago: {
+        tipoPagoOC: async (parent: { tipoPagoOCId?: string | null }) => {
+          const id = parent.tipoPagoOCId?.trim();
+          if (!id) return null;
+          return await this.tipoPagoOCRepository.findById(id);
+        },
+        expediente: async (parent: { expedienteId?: string | null }) => {
+          const id = parent.expedienteId?.trim();
+          if (!id) return null;
+          return await this.expedientePagoRepository.findById(id);
+        },
+      },
       Query: {
         // Obtener una solicitud de pago por ID
         obtenerSolicitudPago: proveedorGuard(async (_: any, { id }: GetSolicitudPagoArgs) => {
@@ -71,7 +91,6 @@ export class SolicitudPagoResolver {
             if (filter.expedienteId) processedFilter.expedienteId = filter.expedienteId;
             if (filter.tipoPagoOCId) processedFilter.tipoPagoOCId = filter.tipoPagoOCId;
             if (filter.estado) processedFilter.estado = filter.estado;
-            if (filter.adminRevisorId) processedFilter.adminRevisorId = filter.adminRevisorId;
             if (filter.fechaCreacionDesde) processedFilter.fechaCreacionDesde = new Date(filter.fechaCreacionDesde);
             if (filter.fechaCreacionHasta) processedFilter.fechaCreacionHasta = new Date(filter.fechaCreacionHasta);
           }
@@ -117,25 +136,25 @@ export class SolicitudPagoResolver {
         }),
         
         // Aprobar solicitud de pago
-        aprobarSolicitudPago: adminGuard(async (_: any, { id, adminRevisorId }: UpdateEstadoSolicitudArgs) => {
+        aprobarSolicitudPago: adminGuard(async (_: any, { input }: AprobarSolicitudPagoArgs) => {
           return await ErrorHandler.handleError(
-            async () => await this.servicio.aprobarSolicitudPago(id, adminRevisorId),
+            async () => await this.servicio.aprobarSolicitudPago(input.id),
             'aprobarSolicitudPago'
           );
         }),
         
         // Observar solicitud de pago
-        observarSolicitudPago: adminGuard(async (_: any, { id, adminRevisorId, comentarios }: UpdateEstadoSolicitudArgs & { comentarios: string }) => {
+        observarSolicitudPago: adminGuard(async (_: any, { input }: ObservarSolicitudPagoArgs) => {
           return await ErrorHandler.handleError(
-            async () => await this.servicio.observarSolicitudPago(id, adminRevisorId, comentarios),
+            async () => await this.servicio.observarSolicitudPago(input.id, input.comentarios),
             'observarSolicitudPago'
           );
         }),
         
         // Rechazar solicitud de pago
-        rechazarSolicitudPago: adminGuard(async (_: any, { id, adminRevisorId, comentarios }: UpdateEstadoSolicitudArgs & { comentarios: string }) => {
+        rechazarSolicitudPago: adminGuard(async (_: any, { input }: RechazarSolicitudPagoArgs) => {
           return await ErrorHandler.handleError(
-            async () => await this.servicio.rechazarSolicitudPago(id, adminRevisorId, comentarios),
+            async () => await this.servicio.rechazarSolicitudPago(input.id, input.comentarios),
             'rechazarSolicitudPago'
           );
         }),

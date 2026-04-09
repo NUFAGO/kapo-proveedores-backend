@@ -5,6 +5,8 @@ export interface IDocumentoSubido extends Document {
   documentoOCId?: string;
   solicitudPagoId?: string;
   requisitoDocumentoId?: string;
+  /** Versión por requisito dentro del mismo padre (solicitud / doc OC). */
+  version?: number;
   usuarioId: string;
   archivos: Array<{
     url: string;
@@ -13,7 +15,7 @@ export interface IDocumentoSubido extends Document {
     tamanioBytes: number;
     fechaSubida: Date;
   }>;
-  estado: 'pendiente' | 'aprobado' | 'observado' | 'rechazado';
+  estado: 'PENDIENTE' | 'APROBADO' | 'OBSERVADO' | 'RECHAZADO';
   fechaSubida: Date;
   fechaRevision?: Date;
   comentariosRevision?: string;
@@ -60,6 +62,11 @@ const DocumentoSubidoSchema = new Schema<IDocumentoSubido>({
     type: String,
     ref: 'RequisitoDocumento'
   },
+  version: {
+    type: Number,
+    default: 1,
+    min: 1,
+  },
   usuarioId: {
     type: String,
     required: true,
@@ -78,8 +85,8 @@ const DocumentoSubidoSchema = new Schema<IDocumentoSubido>({
   estado: {
     type: String,
     required: true,
-    enum: ['pendiente', 'aprobado', 'observado', 'rechazado'],
-    default: 'pendiente'
+    enum: ['PENDIENTE', 'APROBADO', 'OBSERVADO', 'RECHAZADO'],
+    default: 'PENDIENTE'
   },
   fechaSubida: {
     type: Date,

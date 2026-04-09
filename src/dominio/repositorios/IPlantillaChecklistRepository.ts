@@ -23,6 +23,8 @@ export interface IPlantillaChecklistRepository {
   listarInactivas(): Promise<PlantillaChecklist[]>
   listarVigentes(): Promise<PlantillaChecklist[]>
   listarPorCategoria(categoriaChecklistId: string): Promise<PlantillaChecklist[]>
+  /** Plantillas que referencian esta como base (versiones derivadas), excluyendo el propio id. */
+  listarPorPlantillaBase(plantillaBaseId: string): Promise<PlantillaChecklist[]>
   
   // Queries con relaciones
   listarConRequisitos(
@@ -36,4 +38,7 @@ export interface IPlantillaChecklistRepository {
   // Utilidades
   contarPorFiltros(filtros?: PlantillaChecklistFiltros): Promise<number>
   existeNombre(nombre: string, excludeId?: string): Promise<boolean>
+  
+  // MÉTODO BATCH OPTIMIZADO
+  obtenerPorIds(ids: string[]): Promise<PlantillaChecklist[]>
 }

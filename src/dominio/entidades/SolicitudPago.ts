@@ -1,12 +1,20 @@
 // Importar tipos necesarios
-import { DocumentoSubido } from './DocumentoOC';
+import { DocumentoSubido } from './DocumentoSubido';
+
+/** Mayúsculas, alineado con GraphQL `SolicitudPago_Estado` */
+export type EstadoSolicitudPago =
+  | 'BORRADOR'
+  | 'EN_REVISION'
+  | 'OBSERVADA'
+  | 'RECHAZADA'
+  | 'APROBADO';
 
 export interface SolicitudPago {
   id: string;
   expedienteId: string;
   tipoPagoOCId: string;
   montoSolicitado: number;
-  estado: 'borrador' | 'en_revision' | 'observada' | 'rechazada' | 'aprobado';
+  estado: EstadoSolicitudPago;
   fechaCreacion: Date;
   documentosSubidos: DocumentoSubido[];
 }

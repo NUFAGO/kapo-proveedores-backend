@@ -1,0 +1,206 @@
+# ============================================================================
+# APROBACIONES — Kanban / flujo centralizado
+# ============================================================================
+
+enum EntidadTipoAprobacion {
+  solicitud_pago
+  documento_oc
+}
+
+enum EstadoAprobacion {
+  EN_REVISION
+  OBSERVADO
+  APROBADO
+  RECHAZADO
+}
+
+enum ResultadoRevisionRequisito {
+  OBSERVADO
+  APROBADO
+}
+
+type RevisionRequisitoComentario {
+  requisitoDocumentoId: String!
+  resultado: ResultadoRevisionRequisito!
+}
+
+type ItemComentarioAprobacion {
+  mensaje: String!
+  usuarioId: String!
+  usuarioNombre: String
+  fecha: String!
+  revisionesRequisito: [RevisionRequisitoComentario!]
+}
+
+type Aprobacion {
+  id: ID!
+  entidadTipo: EntidadTipoAprobacion!
+  entidadId: String!
+  expedienteId: String!
+  """Monto solicitado; aplica cuando la entidad es una solicitud de pago (TipoPagoOC)."""
+  montoSolicitado: Float
+  """Id del TipoPagoOC de la solicitud (denormalizado)."""
+  tipoPagoOCId: String
+  estado: EstadoAprobacion!
+  solicitanteId: String
+  solicitanteNombre: String
+  revisorId: String
+  revisorNombre: String
+  fechaEnvio: String!
+  fechaUltimaRevision: String
+  numeroCiclo: Int!
+  observaciones: [ItemComentarioAprobacion!]!
+  comentariosAprobacion: [ItemComentarioAprobacion!]!
+  comentariosRechazo: [ItemComentarioAprobacion!]!
+}
+
+type AprobacionConnection {
+  items: [Aprobacion!]!
+  totalCount: Int!
+  page: Int!
+  limit: Int!
+  totalPages: Int!
+}
+
+input CrearAprobacionInput {
+  entidadTipo: EntidadTipoAprobacion!
+  entidadId: String!
+  expedienteId: String!
+  """Requerido si entidadTipo es solicitud_pago."""
+  montoSolicitado: Float
+  tipoPagoOCId: String
+  solicitanteId: String
+  solicitanteNombre: String
+}
+
+input AprobacionFiltros {
+  estado: EstadoAprobacion
+  expedienteId: String
+  entidadTipo: EntidadTipoAprobacion
+  page: Int = 1
+  limit: Int = 20
+  """Si se envía, sustituye el cálculo por página (skip = offset). Útil para scroll infinito por columna."""
+  offset: Int
+}
+
+"""Columna del tablero Kanban de aprobaciones (mismo patrón que reclutamiento)."""
+type AprobacionKanbanColumnData {
+  aprobaciones: [Aprobacion!]!
+  total: Int!
+  hasNextPage: Boolean!
+}
+
+type AprobacionesKanbanData {
+  EN_REVISION: AprobacionKanbanColumnData!
+  OBSERVADO: AprobacionKanbanColumnData!
+  APROBADO: AprobacionKanbanColumnData!
+  RECHAZADO: AprobacionKanbanColumnData!
+}
+
+input AprobacionKanbanFiltros {
+  expedienteId: String
+  entidadTipo: EntidadTipoAprobacion
+  """Tamaño de página inicial por columna (por defecto 20)."""
+  limit: Int = 20
+}
+
+input RevisionRequisitoComentarioInput {
+  requisitoDocumentoId: String!
+  resultado: ResultadoRevisionRequisito!
+}
+
+input AgregarComentarioAprobacionInput {
+  mensaje: String!
+  usuarioId: String!
+  usuarioNombre: String
+  revisionesRequisito: [RevisionRequisitoComentarioInput!]
+}
+
+"""Decisión del revisor por cada entrega (documento subido) al cerrar el checklist."""
+input RevisionDocumentoSubidoChecklistInput {
+  documentoSubidoId: ID!
+  resultado: ResultadoRevisionRequisito!
+  """Obligatorio si resultado es OBSERVADO."""
+  comentario: String
+}
+
+"""Cierra la revisión del kanban: aprueba, observa (mixto) o rechaza; actualiza entidad y documentos."""
+input FinalizarRevisionChecklistAprobacionInput {
+  aprobacionId: ID!
+  rechazar: Boolean!
+  """Obligatorio si rechazar es true."""
+  comentarioRechazo: String
+  """
+  Comentario general del revisor guardado en observaciones o en comentarios de aprobación
+  (no aplica al rechazar; usar comentarioRechazo).
+  """
+  comentarioGeneral: String
+  """Una entrada por cada documento subido del detalle (vacío si rechazar es true)."""
+  revisionesDocumentos: [RevisionDocumentoSubidoChecklistInput!]!
+  revisorId: String!
+  revisorNombre: String
+}
+
+"""Checklist con requisitos (plantillas) y documentos subidos para revisar una fila del kanban."""
+type AprobacionChecklistRevisionDetalle {
+  aprobacionId: ID!
+  estado: EstadoAprobacion!
+  entidadTipo: EntidadTipoAprobacion!
+  entidadId: String!
+  expedienteId: String!
+  montoSolicitado: Float
+  tipoPagoOCId: String
+  checklist: PlantillaChecklist
+  documentosSubidos: [DocumentoSubido!]!
+}
+
+"""
+Aprobación y entregas en una sola respuesta (evita dos round-trips desde el portal proveedor).
+Si no hay aprobación para la entidad, `aprobacion` es null y `documentosSubidos` es vacío.
+"""
+type AprobacionRevisionPorEntidadPayload {
+  aprobacion: Aprobacion
+  documentosSubidos: [DocumentoSubido!]!
+}
+
+extend type Query {
+  aprobacion(id: ID!): Aprobacion
+  aprobacionPorEntidad(entidadTipo: EntidadTipoAprobacion!, entidadId: String!): Aprobacion
+  aprobaciones(filtros: AprobacionFiltros): AprobacionConnection!
+  """Carga inicial del Kanban: una consulta paralela por cada estado (como getKanbanData en reclutamiento)."""
+  getKanbanDataAprobaciones(filtros: AprobacionKanbanFiltros): AprobacionesKanbanData!
+  """Detalle de checklist y entregas al abrir una tarjeta del tablero (admin)."""
+  detalleChecklistRevisionAprobacion(aprobacionId: ID!): AprobacionChecklistRevisionDetalle!
+  """
+  Misma autorización que `aprobacionPorEntidad`: admin o proveedor dueño del expediente.
+  """
+  aprobacionRevisionPorEntidad(
+    entidadTipo: EntidadTipoAprobacion!
+    entidadId: String!
+  ): AprobacionRevisionPorEntidadPayload!
+}
+
+extend type Mutation {
+  crearAprobacion(input: CrearAprobacionInput!): Aprobacion!
+  registrarObservacionAprobacion(
+    id: ID!
+    input: AgregarComentarioAprobacionInput!
+    revisorId: String!
+    revisorNombre: String
+  ): Aprobacion!
+  registrarAprobacionFinal(
+    id: ID!
+    input: AgregarComentarioAprobacionInput!
+    revisorId: String!
+    revisorNombre: String
+  ): Aprobacion!
+  registrarRechazoAprobacion(
+    id: ID!
+    input: AgregarComentarioAprobacionInput!
+    revisorId: String!
+    revisorNombre: String
+  ): Aprobacion!
+  volverAprobacionTrasCorreccion(id: ID!): Aprobacion!
+  """Orquesta estados de aprobación, entidad (solicitud pago o documento OC), documentos y expediente si aplica."""
+  finalizarRevisionChecklistAprobacion(input: FinalizarRevisionChecklistAprobacionInput!): Aprobacion!
+}

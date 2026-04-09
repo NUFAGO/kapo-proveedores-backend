@@ -1,0 +1,67 @@
+# Checklist proveedor: una mutación atómica (solicitud + documentos subidos + aprobación, o documento OC equivalente)
+
+enum ChecklistProveedorContexto {
+  solicitud_pago
+  documento_oc
+}
+
+input ArchivoChecklistInput {
+  url: String!
+  nombreOriginal: String!
+  mimeType: String!
+  tamanioBytes: Float!
+  fechaSubida: String!
+}
+
+input RequisitoArchivosChecklistInput {
+  requisitoDocumentoId: String!
+  archivos: [ArchivoChecklistInput!]!
+}
+
+input ChecklistProveedorBatchInput {
+  context: ChecklistProveedorContexto!
+  expedienteId: String!
+  tipoPagoOCId: String
+  montoSolicitado: Float
+  documentoOCId: String
+  solicitanteId: String!
+  solicitanteNombre: String!
+  requisitosArchivos: [RequisitoArchivosChecklistInput!]!
+  reporteSolicitudPagoIds: [ID!]
+}
+
+type ProcesarChecklistProveedorPayload {
+  """Presente solo si context fue solicitud_pago."""
+  solicitudPagoId: String
+  """Presente solo si context fue documento_oc (mismo id enviado en input, confirmado tras la transacción)."""
+  documentoOCId: String
+  documentosSubidosIds: [ID!]!
+  """Aprobación kanban creada en la misma transacción (entidad = solicitud o documento OC según context)."""
+  aprobacionId: ID!
+}
+
+"""Subsanar tras revisión: solo requisitos con archivos nuevos (URLs provisionales hasta upload real)."""
+input ChecklistProveedorSubsanacionInput {
+  context: ChecklistProveedorContexto!
+  expedienteId: String!
+  """Id de la solicitud de pago o del documento OC (debe estar observado)."""
+  entidadId: String!
+  """Fila de aprobación existente (estado OBSERVADO)."""
+  aprobacionId: ID!
+  solicitanteId: String!
+  solicitanteNombre: String!
+  requisitosArchivos: [RequisitoArchivosChecklistInput!]!
+  """Solo solicitud_pago: si se envía, actualiza monto en solicitud y en la fila de aprobación. Si se omite, no se modifica el monto."""
+  montoSolicitado: Float
+}
+
+type ProcesarChecklistSubsanacionPayload {
+  entidadId: String!
+  aprobacionId: ID!
+  documentosSubidosIds: [ID!]!
+}
+
+extend type Mutation {
+  procesarChecklistProveedor(input: ChecklistProveedorBatchInput!): ProcesarChecklistProveedorPayload!
+  procesarChecklistSubsanacion(input: ChecklistProveedorSubsanacionInput!): ProcesarChecklistSubsanacionPayload!
+}

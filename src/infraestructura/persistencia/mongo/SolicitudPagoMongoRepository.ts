@@ -4,24 +4,27 @@ import { SolicitudPagoModel, ISolicitudPago as ISolicitudPagoMongo } from './sch
 
 export class SolicitudPagoMongoRepository implements ISolicitudPagoRepository {
   
-  async create(data: Omit<SolicitudPago, 'id' | 'createdAt' | 'updatedAt'>): Promise<SolicitudPago> {
+  async create(
+    data: Omit<SolicitudPago, 'id' | 'createdAt' | 'updatedAt'>,
+    session?: any
+  ): Promise<SolicitudPago> {
     const solicitud = new SolicitudPagoModel(data);
-    const saved = await solicitud.save();
+    const saved = session ? await solicitud.save({ session }) : await solicitud.save();
     return this.mapToEntity(saved);
   }
 
-  async findById(id: string): Promise<SolicitudPago | null> {
-    const solicitud = await SolicitudPagoModel.findById(id).exec();
+  async findById(id: string, session?: any): Promise<SolicitudPago | null> {
+    let q = SolicitudPagoModel.findById(id);
+    if (session) q = q.session(session);
+    const solicitud = await q.exec();
     return solicitud ? this.mapToEntity(solicitud) : null;
   }
 
-  async update(id: string, data: Partial<SolicitudPago>): Promise<SolicitudPago | null> {
-    const updated = await SolicitudPagoModel.findByIdAndUpdate(
-      id, 
-      data, 
-      { new: true, runValidators: true }
-    ).exec();
-    return updated ? this.mapToEntity(updated) : null;
+  async update(id: string, data: Partial<SolicitudPago>, session?: any): Promise<SolicitudPago | null> {
+    const opts: Record<string, unknown> = { new: true, runValidators: true };
+    if (session) opts['session'] = session;
+    const updated = await SolicitudPagoModel.findByIdAndUpdate(id, data, opts as any).exec();
+    return updated ? this.mapToEntity(updated as unknown as ISolicitudPagoMongo) : null;
   }
 
   async delete(id: string): Promise<boolean> {
@@ -37,11 +40,10 @@ export class SolicitudPagoMongoRepository implements ISolicitudPagoRepository {
     return solicitudes.map(sol => this.mapToEntity(sol));
   }
 
-  async findByTipoPagoOC(tipoPagoOCId: string): Promise<SolicitudPago[]> {
-    const solicitudes = await SolicitudPagoModel
-      .find({ tipoPagoOCId })
-      .sort({ fechaCreacion: -1 })
-      .exec();
+  async findByTipoPagoOC(tipoPagoOCId: string, session?: any): Promise<SolicitudPago[]> {
+    let q = SolicitudPagoModel.find({ tipoPagoOCId }).sort({ fechaCreacion: -1 });
+    if (session) q = q.session(session);
+    const solicitudes = await q.exec();
     return solicitudes.map(sol => this.mapToEntity(sol));
   }
 
@@ -97,12 +99,18 @@ export class SolicitudPagoMongoRepository implements ISolicitudPagoRepository {
     return result.length > 0 ? result[0].total : 0;
   }
 
-  async sumMontoSolicitadoByExpedienteAndEstado(expedienteId: string, estado: SolicitudPago['estado']): Promise<number> {
-    const result = await SolicitudPagoModel.aggregate([
+  async sumMontoSolicitadoByExpedienteAndEstado(
+    expedienteId: string,
+    estado: SolicitudPago['estado'],
+    session?: any
+  ): Promise<number> {
+    let agg = SolicitudPagoModel.aggregate([
       { $match: { expedienteId, estado } },
-      { $group: { _id: null, total: { $sum: '$montoSolicitado' } } }
-    ]).exec();
-    
+      { $group: { _id: null, total: { $sum: '$montoSolicitado' } } },
+    ]);
+    if (session) agg = agg.session(session);
+    const result = await agg.exec();
+
     return result.length > 0 ? result[0].total : 0;
   }
 

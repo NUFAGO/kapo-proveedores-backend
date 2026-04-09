@@ -21,18 +21,18 @@ export class ExpedientePagoMongoRepository implements IExpedientePagoRepository 
     return this.mapToEntity(saved);
   }
 
-  async findById(id: string): Promise<ExpedientePago | null> {
-    const expediente = await ExpedientePagoModel.findById(id).exec();
+  async findById(id: string, session?: any): Promise<ExpedientePago | null> {
+    let q = ExpedientePagoModel.findById(id);
+    if (session) q = q.session(session);
+    const expediente = await q.exec();
     return expediente ? this.mapToEntity(expediente) : null;
   }
 
-  async update(id: string, data: Partial<ExpedientePago>): Promise<ExpedientePago | null> {
-    const updated = await ExpedientePagoModel.findByIdAndUpdate(
-      id, 
-      data, 
-      { new: true, runValidators: true }
-    ).exec();
-    return updated ? this.mapToEntity(updated) : null;
+  async update(id: string, data: Partial<ExpedientePago>, session?: any): Promise<ExpedientePago | null> {
+    const opts: Record<string, unknown> = { new: true, runValidators: true };
+    if (session) opts['session'] = session;
+    const updated = await ExpedientePagoModel.findByIdAndUpdate(id, data, opts as any).exec();
+    return updated ? this.mapToEntity(updated as unknown as IExpedientePagoMongo) : null;
   }
 
   async delete(id: string): Promise<boolean> {
@@ -93,41 +93,56 @@ export class ExpedientePagoMongoRepository implements IExpedientePagoRepository 
     limit: number;
     totalPages: number;
   }> {
-    const page = filters.page || 1;
-    const limit = filters.limit || 10;
-    const skip = (page - 1) * limit;
-    
-    const query: any = {};
-    
-    if (filters.ocId) query.ordenCompraId = filters.ocId;
-    if (filters.ocCodigo) query.codigo = filters.ocCodigo;
-    if (filters.proveedorId) query.proveedorId = filters.proveedorId;
-    if (filters.estado) query.estado = filters.estado;
-    if (filters.adminCreadorId) query.adminCreadorId = filters.adminCreadorId;
-    if (filters.searchTerm) {
-      query.$or = [
-        { codigo: { $regex: filters.searchTerm, $options: 'i' } },
-        { descripcion: { $regex: filters.searchTerm, $options: 'i' } }
-      ];
+    try {
+      const page = filters.page || 1;
+      const limit = filters.limit || 10;
+      const skip = (page - 1) * limit;
+      
+      const query: any = {};
+      
+      if (filters.ocId) query.ordenCompraId = filters.ocId;
+      if (filters.ocCodigo) query.codigo = filters.ocCodigo;
+      if (filters.proveedorId) query.proveedorId = filters.proveedorId;
+      if (filters.estado) query.estado = filters.estado;
+      if (filters.adminCreadorId) query.adminCreadorId = filters.adminCreadorId;
+      if (filters.searchTerm) {
+        query.$or = [
+          { codigo: { $regex: filters.searchTerm, $options: 'i' } },
+          { descripcion: { $regex: filters.searchTerm, $options: 'i' } }
+        ];
+      }
+
+      const [data, total] = await Promise.all([
+        ExpedientePagoModel
+          .find(query)
+          .sort({ fechaCreacion: -1 })
+          .skip(skip)
+          .limit(limit)
+          .exec(),
+        ExpedientePagoModel.countDocuments(query).exec()
+      ]);
+
+      // Asegurarse de que data siempre sea un array
+      const safeData = Array.isArray(data) ? data : [];
+      const safeTotal = typeof total === 'number' ? total : 0;
+
+      return {
+        data: safeData.map(exp => this.mapToEntity(exp)),
+        total: safeTotal,
+        page,
+        limit,
+        totalPages: Math.ceil(safeTotal / limit)
+      };
+    } catch (error) {
+      // En caso de error, retornar estructura vacía pero válida
+      return {
+        data: [],
+        total: 0,
+        page: filters.page || 1,
+        limit: filters.limit || 10,
+        totalPages: 0
+      };
     }
-
-    const [data, total] = await Promise.all([
-      ExpedientePagoModel
-        .find(query)
-        .sort({ fechaCreacion: -1 })
-        .skip(skip)
-        .limit(limit)
-        .exec(),
-      ExpedientePagoModel.countDocuments(query).exec()
-    ]);
-
-    return {
-      data: data.map(exp => this.mapToEntity(exp)),
-      total,
-      page,
-      limit,
-      totalPages: Math.ceil(total / limit)
-    };
   }
 
   async updateEstado(id: string, estado: ExpedientePago['estado']): Promise<ExpedientePago | null> {
@@ -143,7 +158,7 @@ export class ExpedientePagoMongoRepository implements IExpedientePagoRepository 
       { new: true, runValidators: true }
     ).exec();
     
-    return updated ? this.mapToEntity(updated) : null;
+    return updated ? this.mapToEntity(updated as unknown as IExpedientePagoMongo) : null;
   }
 
   async updateSaldos(id: string, montoComprometido: number, montoPagado: number): Promise<ExpedientePago | null> {
@@ -162,7 +177,7 @@ export class ExpedientePagoMongoRepository implements IExpedientePagoRepository 
       { new: true, runValidators: true }
     ).exec();
     
-    return updated ? this.mapToEntity(updated) : null;
+    return updated ? this.mapToEntity(updated as unknown as IExpedientePagoMongo) : null;
   }
 
   async existsExpedienteForOc(ocId: string): Promise<boolean> {

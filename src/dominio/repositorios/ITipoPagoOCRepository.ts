@@ -2,9 +2,9 @@ import { TipoPagoOC, TipoPagoOCFilter } from '../entidades/TipoPagoOC';
 
 export interface ITipoPagoOCRepository {
   // Métodos básicos CRUD
-  findById(id: string): Promise<TipoPagoOC | null>;
+  findById(id: string, session?: any): Promise<TipoPagoOC | null>;
   create(data: Partial<TipoPagoOC>, session?: any): Promise<TipoPagoOC>;
-  update(id: string, data: Partial<TipoPagoOC>): Promise<TipoPagoOC | null>;
+  update(id: string, data: Partial<TipoPagoOC>, session?: any): Promise<TipoPagoOC | null>;
   delete(id: string): Promise<boolean>;
   
   // Métodos específicos para tipos de pago OC
@@ -13,7 +13,7 @@ export interface ITipoPagoOCRepository {
   findByChecklistId(checklistId: string): Promise<TipoPagoOC[]>;
   
   // Métodos de orden y restricciones
-  findByExpedienteAndOrden(expedienteId: string, orden: number): Promise<TipoPagoOC | null>;
+  findByExpedienteAndOrden(expedienteId: string, orden: number, session?: any): Promise<TipoPagoOC | null>;
   findMaxOrdenByExpediente(expedienteId: string): Promise<number>;
   
   // Validaciones

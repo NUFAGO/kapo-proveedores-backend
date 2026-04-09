@@ -5,7 +5,7 @@ export interface ISolicitudPago extends Document {
   expedienteId: string;
   tipoPagoOCId: string;
   montoSolicitado: number;
-  estado: 'borrador' | 'en_revision' | 'observada' | 'rechazada' | 'aprobado';
+  estado: 'BORRADOR' | 'EN_REVISION' | 'OBSERVADA' | 'RECHAZADA' | 'APROBADO';
   fechaCreacion: Date;
   createdAt: Date;
   updatedAt: Date;
@@ -31,8 +31,8 @@ const SolicitudPagoSchema = new Schema<ISolicitudPago>({
   estado: {
     type: String,
     required: true,
-    enum: ['borrador', 'en_revision', 'observada', 'rechazada', 'aprobado'],
-    default: 'borrador'
+    enum: ['BORRADOR', 'EN_REVISION', 'OBSERVADA', 'RECHAZADA', 'APROBADO'],
+    default: 'BORRADOR'
   },
   fechaCreacion: {
     type: Date,
@@ -53,19 +53,18 @@ SolicitudPagoSchema.index({ expedienteId: 1, estado: 1 });
 
 // Middleware para validaciones
 SolicitudPagoSchema.pre('save', function(next) {
-  // Validar transición de estados
   if (this.isModified('estado')) {
     const estadosValidos: Record<string, string[]> = {
-      'borrador': ['en_revision', 'rechazada'],
-      'en_revision': ['observada', 'rechazada', 'aprobado'],
-      'observada': ['en_revision'],
-      'rechazada': ['borrador'],
-      'aprobado': [] // Estado final
+      'BORRADOR': ['EN_REVISION', 'RECHAZADA'],
+      'EN_REVISION': ['OBSERVADA', 'RECHAZADA', 'APROBADO'],
+      'OBSERVADA': ['EN_REVISION'],
+      'RECHAZADA': ['BORRADOR'],
+      'APROBADO': []
     };
 
     const estadoAnterior = this.getChanges().$set?.estado || this.estado;
     const transicionesPermitidas = estadosValidos[estadoAnterior] || [];
-    
+
     if (this.estado !== estadoAnterior && !transicionesPermitidas.includes(this.estado)) {
       return next(new Error(`Transición de estado inválida: ${estadoAnterior} -> ${this.estado}`));
     }

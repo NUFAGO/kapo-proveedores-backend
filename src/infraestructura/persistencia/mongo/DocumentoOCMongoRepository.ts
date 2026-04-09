@@ -12,18 +12,18 @@ export class DocumentoOCMongoRepository implements IDocumentoOCRepository {
     return this.mapToEntity(saved);
   }
 
-  async findById(id: string): Promise<DocumentoOC | null> {
-    const documento = await DocumentoOCModel.findById(id).exec();
+  async findById(id: string, session?: any): Promise<DocumentoOC | null> {
+    let q = DocumentoOCModel.findById(id);
+    if (session) q = q.session(session);
+    const documento = await q.exec();
     return documento ? this.mapToEntity(documento) : null;
   }
 
-  async update(id: string, data: Partial<DocumentoOC>): Promise<DocumentoOC | null> {
-    const updated = await DocumentoOCModel.findByIdAndUpdate(
-      id, 
-      data, 
-      { new: true, runValidators: true }
-    ).exec();
-    return updated ? this.mapToEntity(updated) : null;
+  async update(id: string, data: Partial<DocumentoOC>, session?: any): Promise<DocumentoOC | null> {
+    const opts: Record<string, unknown> = { new: true, runValidators: true };
+    if (session) opts['session'] = session;
+    const updated = await DocumentoOCModel.findByIdAndUpdate(id, data, opts as any).exec();
+    return updated ? this.mapToEntity(updated as unknown as IDocumentoOC) : null;
   }
 
   async delete(id: string): Promise<boolean> {
@@ -31,11 +31,10 @@ export class DocumentoOCMongoRepository implements IDocumentoOCRepository {
     return !!result;
   }
 
-  async findByExpedienteId(expedienteId: string): Promise<DocumentoOC[]> {
-    const documentos = await DocumentoOCModel
-      .find({ expedienteId })
-      .sort({ createdAt: -1 })
-      .exec();
+  async findByExpedienteId(expedienteId: string, session?: any): Promise<DocumentoOC[]> {
+    let q = DocumentoOCModel.find({ expedienteId }).sort({ createdAt: -1 });
+    if (session) q = q.session(session);
+    const documentos = await q.exec();
     return documentos.map(doc => this.mapToEntity(doc));
   }
 
@@ -88,10 +87,10 @@ export class DocumentoOCMongoRepository implements IDocumentoOCRepository {
 
   async findObligatoriosPendientesByExpediente(expedienteId: string): Promise<DocumentoOC[]> {
     const documentos = await DocumentoOCModel
-      .find({ 
-        expedienteId, 
-        obligatorio: true, 
-        estado: 'pendiente' 
+      .find({
+        expedienteId,
+        obligatorio: true,
+        estado: { $ne: 'APROBADO' },
       })
       .sort({ createdAt: -1 })
       .exec();
@@ -115,11 +114,7 @@ export class DocumentoOCMongoRepository implements IDocumentoOCRepository {
   }
 
   async updateEstado(id: string, estado: DocumentoOC['estado']): Promise<DocumentoOC | null> {
-    const updateData: any = { estado };
-    
-    if (estado === 'cargado') {
-      updateData.fechaCarga = new Date();
-    }
+    const updateData: Record<string, unknown> = { estado };
 
     const updated = await DocumentoOCModel.findByIdAndUpdate(
       id, 
@@ -127,7 +122,7 @@ export class DocumentoOCMongoRepository implements IDocumentoOCRepository {
       { new: true, runValidators: true }
     ).exec();
     
-    return updated ? this.mapToEntity(updated) : null;
+    return updated ? this.mapToEntity(updated as unknown as IDocumentoOC) : null;
   }
 
   private mapToEntity(doc: IDocumentoOC): DocumentoOC {

@@ -1,0 +1,179 @@
+# ============================================================================
+# SCHEMA DE PROVEEDORES
+# ============================================================================
+
+type Proveedor {
+    id: ID!
+    razon_social: String!
+    direccion: String
+    nombre_comercial: String
+    ruc: String!
+    rubro: String
+    estado: String!
+    tipo: String
+    actividad: String
+    correo: String
+    telefono: String
+    estado_sunat: String
+    condicion: String
+    agente_retencion: Boolean
+    sub_contrata: Boolean
+    distrito: String
+    provincia: String
+    departamento: String
+    
+    # Relaciones
+    mediosPago: [MediosPagoProveedor]
+    contactos: [ContactoProveedor]
+    estadisticasCotizaciones: EstadisticasDetalladas
+}
+
+type ProveedorBasico {
+    id: ID!
+    razon_social: String!
+    direccion: String
+    nombre_comercial: String
+    ruc: String!
+    rubro: String
+    estado: String!
+    tipo: String
+    actividad: String
+    correo: String
+    telefono: String
+    estado_sunat: String
+    condicion: String
+    agente_retencion: Boolean
+    sub_contrata: Boolean
+    distrito: String
+    provincia: String
+    departamento: String
+}
+
+type MediosPagoProveedor {
+    id: ID!
+    entidad: Banco
+    nro_cuenta: String
+    detalles: String
+    titular: String
+    validado: Boolean!
+    mostrar: Boolean!
+}
+
+type Banco {
+    id: ID
+    nombre: String
+    abreviatura: String
+}
+
+type ContactoProveedor {
+    id: ID!
+    nombres: String!
+    apellidos: String!
+    cargo: String
+    telefono: String
+}
+
+type CotizacionPorEstado {
+    estado: String!
+    cantidad: Int!
+    porcentaje: Float!
+}
+
+type EstadisticasDetalladas {
+    proveedor_id: ID!
+    razon_social: String!
+    totalCotizaciones: Int!
+    cotizacionesPorEstado: [CotizacionPorEstado]!
+    primeraCotizacion: String
+    ultimaCotizacion: String
+}
+
+# Input para crear/actualizar proveedor
+input ProveedorInput {
+    razon_social: String!
+    ruc: String!
+    direccion: String
+    nombre_comercial: String
+    rubro: String
+    estado: String
+    tipo: String
+    actividad: String
+    correo: String
+    telefono: String
+    estado_sunat: String
+    condicion: String
+    agente_retencion: Boolean
+    sub_contrata: Boolean
+    distrito: String
+    provincia: String
+    departamento: String
+}
+
+# Tipo de respuesta paginada para proveedores
+type ProveedorPaginatedResponse {
+    data: [Proveedor!]!
+    total: Int!
+    page: Int!
+    limit: Int!
+    totalPages: Int!
+}
+
+# Input para filtros de proveedores
+input ProveedorFilterInput {
+    estado: String
+    tipo: String
+    rubro: String
+    sub_contrata: Boolean
+    departamento: String
+    provincia: String
+    distrito: String
+    searchTerm: String
+}
+
+# Input para paginación de proveedores
+input ProveedorPaginationInput {
+    page: Int
+    limit: Int
+    sortBy: String
+    sortOrder: String
+    filter: ProveedorFilterInput
+}
+
+# ============================================================================
+# QUERIES
+# ============================================================================
+
+type Query {
+    # Listar todos los proveedores con relaciones completas
+    listProveedor: [Proveedor]
+    
+    # Listar proveedores paginados con filtros
+    listProveedoresPaginated(filter: ProveedorPaginationInput): ProveedorPaginatedResponse!
+    
+    # Obtener proveedor por ID con relaciones completas
+    getProveedorById(id: ID!): Proveedor
+    
+    # Buscar proveedor por RUC
+    getProveedorByRuc(ruc: String!): Proveedor
+    
+    # Obtener estadísticas de cotizaciones por proveedor
+    getEstadisticasCotizaciones(proveedorId: ID!): EstadisticasDetalladas
+    
+    # Listar proveedores con subcontratación habilitada
+    listProveedoresSubContrata: [ProveedorBasico]
+}
+
+# ============================================================================
+# MUTATIONS
+# ============================================================================
+
+type Mutation {
+    # Crear nuevo proveedor
+    addProveedor(input: ProveedorInput!): Proveedor!
+
+    # Actualizar proveedor existente
+    updateProveedor(id: ID!, input: ProveedorInput!): Proveedor
+
+    # Eliminar proveedor
+    deleteProveedor(id: ID!): Proveedor
+}

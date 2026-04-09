@@ -2,13 +2,13 @@ import { DocumentoOC, DocumentoOCFilter } from '../entidades/DocumentoOC';
 
 export interface IDocumentoOCRepository {
   // Métodos básicos CRUD
-  findById(id: string): Promise<DocumentoOC | null>;
+  findById(id: string, session?: any): Promise<DocumentoOC | null>;
   create(data: Partial<DocumentoOC>, session?: any): Promise<DocumentoOC>;
-  update(id: string, data: Partial<DocumentoOC>): Promise<DocumentoOC | null>;
+  update(id: string, data: Partial<DocumentoOC>, session?: any): Promise<DocumentoOC | null>;
   delete(id: string): Promise<boolean>;
   
   // Métodos específicos para documentos OC
-  findByExpedienteId(expedienteId: string): Promise<DocumentoOC[]>;
+  findByExpedienteId(expedienteId: string, session?: any): Promise<DocumentoOC[]>;
   findByChecklistId(checklistId: string): Promise<DocumentoOC[]>;
   
   // Métodos de estado

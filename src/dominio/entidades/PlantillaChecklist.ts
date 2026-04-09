@@ -4,6 +4,7 @@ export interface PlantillaChecklist {
   nombre: string
   descripcion?: string
   categoriaChecklistId: string
+  plantillaBaseId?: string
   categoria?: {
     id: string
     nombre: string

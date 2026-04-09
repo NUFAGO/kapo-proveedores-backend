@@ -1,13 +1,25 @@
 import { IDocumentoSubidoRepository } from '../../../dominio/repositorios/IDocumentoSubidoRepository';
-import { DocumentoSubido, DocumentoSubidoFilter } from '../../../dominio/entidades/DocumentoOC';
+import { DocumentoSubido, DocumentoSubidoFilter } from '../../../dominio/entidades/DocumentoSubido';
 import { DocumentoSubidoModel, IDocumentoSubido as IDocumentoSubidoMongo } from './schemas/DocumentoSubidoSchema';
 
 export class DocumentoSubidoMongoRepository implements IDocumentoSubidoRepository {
   
-  async create(data: Omit<DocumentoSubido, 'id' | 'createdAt' | 'updatedAt'>): Promise<DocumentoSubido> {
+  async create(
+    data: Omit<DocumentoSubido, 'id' | 'createdAt' | 'updatedAt'>,
+    session?: any
+  ): Promise<DocumentoSubido> {
     const documento = new DocumentoSubidoModel(data);
-    const saved = await documento.save();
+    const saved = session ? await documento.save({ session }) : await documento.save();
     return this.mapToEntity(saved);
+  }
+
+  async createBatch(
+    data: Omit<DocumentoSubido, 'id' | 'createdAt' | 'updatedAt'>[],
+    session?: any
+  ): Promise<DocumentoSubido[]> {
+    if (!data.length) return [];
+    const saved = await DocumentoSubidoModel.insertMany(data, session ? { session } : {});
+    return saved.map((doc) => this.mapToEntity(doc as any));
   }
 
   async findById(id: string): Promise<DocumentoSubido | null> {
@@ -58,6 +70,7 @@ export class DocumentoSubidoMongoRepository implements IDocumentoSubidoRepositor
     
     if (filters.documentoOCId) query.documentoOCId = filters.documentoOCId;
     if (filters.solicitudPagoId) query.solicitudPagoId = filters.solicitudPagoId;
+    if (filters.requisitoDocumentoId) query.requisitoDocumentoId = filters.requisitoDocumentoId;
     if (filters.usuarioId) query.usuarioId = filters.usuarioId;
     if (filters.estado) query.estado = filters.estado;
 
@@ -120,6 +133,33 @@ export class DocumentoSubidoMongoRepository implements IDocumentoSubidoRepositor
     return documento ? this.mapToEntity(documento) : null;
   }
 
+  async findMaxVersionByPadreYRequisito(
+    params: { solicitudPagoId?: string; documentoOCId?: string; requisitoDocumentoId: string },
+    session?: any
+  ): Promise<number> {
+    const match: Record<string, string> = {
+      requisitoDocumentoId: params.requisitoDocumentoId,
+    };
+    if (params.solicitudPagoId) {
+      match['solicitudPagoId'] = params.solicitudPagoId;
+    } else if (params.documentoOCId) {
+      match['documentoOCId'] = params.documentoOCId;
+    } else {
+      throw new Error('Debe indicarse solicitudPagoId o documentoOCId');
+    }
+    const pipeline = [
+      { $match: match },
+      { $group: { _id: null as string | null, maxV: { $max: { $ifNull: ['$version', 1] } } } },
+    ];
+    let agg = DocumentoSubidoModel.aggregate(pipeline);
+    if (session) {
+      agg = agg.session(session);
+    }
+    const res = await agg.exec();
+    const maxV = res[0]?.maxV;
+    return typeof maxV === 'number' && Number.isFinite(maxV) ? maxV : 0;
+  }
+
   private mapToEntity(doc: IDocumentoSubidoMongo): DocumentoSubido {
     return {
       id: doc._id.toString(),
@@ -128,7 +168,7 @@ export class DocumentoSubidoMongoRepository implements IDocumentoSubidoRepositor
       ...(doc.requisitoDocumentoId && { requisitoDocumentoId: doc.requisitoDocumentoId }),
       usuarioId: doc.usuarioId,
       archivos: doc.archivos,
-      version: 1, // No usamos versiones, cada documento es un registro nuevo
+      version: doc.version != null && Number.isFinite(doc.version) ? Number(doc.version) : 1,
       estado: doc.estado,
       fechaSubida: doc.fechaSubida,
       ...(doc.fechaRevision && { fechaRevision: doc.fechaRevision }),

@@ -40,6 +40,9 @@ export class PlantillaChecklistMongoRepository extends BaseMongoRepository<Plant
       nombre: doc.nombre,
       descripcion: doc.descripcion,
       categoriaChecklistId,
+      ...(doc.plantillaBaseId != null && doc.plantillaBaseId !== '' && {
+        plantillaBaseId: String(doc.plantillaBaseId)
+      }),
       ...(categoria && { categoria }),
       activo: doc.activo,
       fechaCreacion: doc.fechaCreacion.toISOString(),
@@ -515,6 +518,23 @@ export class PlantillaChecklistMongoRepository extends BaseMongoRepository<Plant
     }
   }
 
+  async listarPorPlantillaBase(plantillaBaseId: string): Promise<PlantillaChecklist[]> {
+    try {
+      if (!Types.ObjectId.isValid(plantillaBaseId)) {
+        return [];
+      }
+      const docs = await PlantillaChecklistModel.find({
+        plantillaBaseId,
+        _id: { $ne: new Types.ObjectId(plantillaBaseId) }
+      }).sort({ fechaCreacion: -1 });
+
+      return docs.map(doc => this.toDomain(doc));
+    } catch (error) {
+      console.error('Error al listar plantillas por plantilla base:', error);
+      throw error;
+    }
+  }
+
   async contarPorFiltros(filtros?: PlantillaChecklistFiltros): Promise<number> {
     try {
       const query: any = {};
@@ -549,6 +569,156 @@ export class PlantillaChecklistMongoRepository extends BaseMongoRepository<Plant
       return count > 0;
     } catch (error) {
       console.error('Error al verificar existencia de nombre:', error);
+      throw error;
+    }
+  }
+
+  // MÉTODO BATCH OPTIMIZADO CON REQUISITOS
+  async obtenerPorIds(ids: string[]): Promise<PlantillaChecklist[]> {
+    try {
+      if (!ids || ids.length === 0) {
+        return [];
+      }
+
+      // Convertir IDs a ObjectId para el aggregation
+      const objectIds = ids.map(id => new Types.ObjectId(id));
+
+      // Usar aggregation pipeline para incluir requisitos como en listarConRequisitos
+      const pipeline: any[] = [
+        // Match por IDs
+        { $match: { _id: { $in: objectIds } } },
+        
+        // Agregar campo _id como string para el lookup
+        {
+          $addFields: {
+            checklistIdString: { $toString: "$_id" },
+            categoriaChecklistIdString: { $toString: "$categoriaChecklistId" }
+          }
+        },
+        
+        // Lookup para traer requisitos
+        {
+          $lookup: {
+            from: 'requisitos_documento',
+            localField: 'checklistIdString',
+            foreignField: 'checklistId',
+            as: 'requisitos'
+          }
+        },
+        
+        // Lookup para traer plantillaDocumento de cada requisito
+        {
+          $lookup: {
+            from: 'plantilladocumentos',
+            let: { requisitosIds: '$requisitos' },
+            pipeline: [
+              {
+                $match: {
+                  $expr: {
+                    $in: ['$_id', {
+                      $map: {
+                        input: '$$requisitosIds',
+                        as: 'req',
+                        in: { $toObjectId: '$$req.plantillaDocumentoId' }
+                      }
+                    }]
+                  }
+                }
+              }
+            ],
+            as: 'plantillasDocumento'
+          }
+        },
+        
+        // Populate de categoría
+        {
+          $lookup: {
+            from: 'categoriachecklists',
+            let: { categoriaId: "$categoriaChecklistIdString" },
+            pipeline: [
+              {
+                $addFields: {
+                  categoriaIdString: { $toString: "$_id" }
+                }
+              },
+              {
+                $match: {
+                  $expr: {
+                    $eq: ["$categoriaIdString", "$$categoriaId"]
+                  }
+                }
+              }
+            ],
+            as: 'categoria'
+          }
+        },
+        
+        // Unwind de categoría
+        { $unwind: { path: '$categoria', preserveNullAndEmptyArrays: true } }
+      ];
+
+      const docs = await PlantillaChecklistModel.aggregate(pipeline).exec();
+
+      // Procesar resultados igual que en listarConRequisitos
+      return docs.map((doc: any) => {
+        // Formatear categoría si existe
+        const categoria = doc.categoria ? {
+          id: doc.categoria._id?.toString() || doc.categoria._id,
+          nombre: doc.categoria.nombre,
+          tipoUso: doc.categoria.tipoUso || '',
+          descripcion: doc.categoria.descripcion,
+          estado: doc.categoria.estado ?? 'activo',
+          fechaCreacion: doc.categoria.fechaCreacion?.toISOString?.() || new Date().toISOString(),
+          fechaActualizacion: doc.categoria.fechaActualizacion?.toISOString?.()
+        } : undefined;
+
+        // Formatear requisitos
+        const requisitosDomain = (doc.requisitos || [])
+          .filter((req: any) => req && req._id)
+          .map((req: any) => {
+            // Buscar la plantilla de documento asociada
+            const plantillaDocumento = req.plantillaDocumentoId && doc.plantillasDocumento
+              ? doc.plantillasDocumento.find((pd: any) => pd._id.toString() === req.plantillaDocumentoId)
+              : null;
+
+            return {
+              id: req._id.toString(),
+              checklistId: req.checklistId || doc._id.toString(),
+              tipoRequisito: req.tipoRequisito || 'documento',
+              plantillaDocumentoId: req.plantillaDocumentoId,
+              formularioId: req.formularioId,
+              obligatorio: Boolean(req.obligatorio),
+              orden: Number(req.orden) || 0,
+              activo: req.activo ?? true,
+              plantillaDocumento: plantillaDocumento ? {
+                id: plantillaDocumento._id.toString(),
+                codigo: plantillaDocumento.codigo,
+                tipoDocumentoId: plantillaDocumento.tipoDocumentoId,
+                nombrePlantilla: plantillaDocumento.nombrePlantilla,
+                plantillaUrl: plantillaDocumento.plantillaUrl,
+                formatosPermitidos: plantillaDocumento.formatosPermitidos,
+                fechaCreacion: plantillaDocumento.fechaCreacion?.toISOString?.() || new Date().toISOString(),
+                activo: plantillaDocumento.activo
+              } : null
+            };
+          });
+
+        // Construir objeto de dominio
+        return {
+          id: doc._id.toString(),
+          codigo: doc.codigo,
+          nombre: doc.nombre,
+          descripcion: doc.descripcion,
+          categoriaChecklistId: doc.categoriaChecklistId,
+          ...(categoria && { categoria }),
+          activo: doc.activo,
+          fechaCreacion: doc.fechaCreacion?.toISOString?.() || new Date().toISOString(),
+          fechaActualizacion: doc.fechaActualizacion?.toISOString?.(),
+          requisitos: requisitosDomain
+        };
+      });
+    } catch (error) {
+      console.error('Error al obtener plantillas por IDs:', error);
       throw error;
     }
   }

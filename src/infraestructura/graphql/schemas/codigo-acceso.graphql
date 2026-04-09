@@ -1,0 +1,92 @@
+# ============================================================================
+# SCHEMA DE CÓDIGOS DE ACCESO
+# ============================================================================
+
+type CodigoAcceso {
+  id: ID!
+  codigo: String!
+  proveedorId: String!
+  proveedorRuc: String!
+  proveedorNombre: String
+  tipo: String!
+  fechaGeneracion: String!
+  fechaExpiracion: String!
+  usado: Boolean!
+  fechaUso: String
+  creadoPor: String
+  motivoInvalidacion: String
+  activo: Boolean!
+}
+
+type VerificacionResponse {
+  valido: Boolean!
+  proveedorId: String
+  proveedor: Proveedor
+  error: String
+  tipo: String
+}
+
+type GeneracionResponse {
+  exito: Boolean!
+  codigo: CodigoAcceso
+  mensaje: String
+}
+
+type CodigosGenerados {
+  codigoProveedor: String!
+  codigoAcceso: String!
+  codigoVerificacion: String!
+  codigoBD: CodigoAcceso!
+}
+
+type CodigoAccesoConnection {
+  codigos: [CodigoAcceso!]!
+  totalCount: Int!
+  page: Int!
+  limit: Int!
+  totalPages: Int!
+}
+
+input GenerarCodigoInput {
+  proveedorId: String!
+  proveedorRuc: String!
+  proveedorNombre: String
+  tipo: String!
+  creadoPor: String
+  diasValidez: Int = 30
+}
+
+input CodigoAccesoFiltros {
+  proveedorId: String
+  tipo: String
+  activo: Boolean
+  page: Int = 1
+  limit: Int = 10
+}
+
+extend type Query {
+  codigosAcceso(filtros: CodigoAccesoFiltros): CodigoAccesoConnection!
+  codigoAcceso(id: ID!): CodigoAcceso
+  codigoAccesoPorCodigo(codigo: String!): CodigoAcceso
+  verificarCodigoAcceso(codigo: String!): VerificacionResponse!
+  estadisticasCodigosPorProveedor(proveedorId: String!): EstadisticasCodigos!
+}
+
+extend type Mutation {
+  generarCodigoAcceso(input: GenerarCodigoInput!): GeneracionResponse!
+  generarCodigosCompletos(
+    proveedorId: String!
+    proveedorRuc: String!
+    proveedorNombre: String
+    creadoPor: String
+    diasValidez: Int = 30
+  ): CodigosGenerados!
+  invalidarCodigo(codigo: String!, motivo: String!): Boolean!
+  invalidarCodigosAnteriores(proveedorId: String!, motivo: String!): Boolean!
+  marcarCodigoComoUsado(codigo: String!): Boolean!
+}
+
+type EstadisticasCodigos {
+  totalActivos: Int!
+  proveedorId: String!
+}

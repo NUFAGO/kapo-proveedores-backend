@@ -20,8 +20,10 @@ export abstract class BaseMongoRepository<T> implements IBaseRepository<T> {
   /**
    * Busca un registro por ID
    */
-  async findById(id: string): Promise<T | null> {
-    const doc = await this.model.findById(id);
+  async findById(id: string, session?: any): Promise<T | null> {
+    let q = this.model.findById(id);
+    if (session) q = q.session(session);
+    const doc = await q;
     return doc ? this.toDomain(doc) : null;
   }
 
@@ -39,12 +41,10 @@ export abstract class BaseMongoRepository<T> implements IBaseRepository<T> {
   /**
    * Actualiza un registro existente
    */
-  async update(id: string, data: Partial<T>): Promise<T | null> {
-    const updated = await this.model.findByIdAndUpdate(
-      id,
-      { $set: data },
-      { new: true, runValidators: true }
-    );
+  async update(id: string, data: Partial<T>, session?: any): Promise<T | null> {
+    const opts: Record<string, unknown> = { new: true, runValidators: true };
+    if (session) opts['session'] = session;
+    const updated = await this.model.findByIdAndUpdate(id, { $set: data }, opts);
     return updated ? this.toDomain(updated) : null;
   }
 

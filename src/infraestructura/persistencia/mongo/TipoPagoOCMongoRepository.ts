@@ -12,18 +12,18 @@ export class TipoPagoOCMongoRepository implements ITipoPagoOCRepository {
     return this.mapToEntity(saved);
   }
 
-  async findById(id: string): Promise<TipoPagoOC | null> {
-    const tipoPago = await TipoPagoOCModel.findById(id).exec();
+  async findById(id: string, session?: any): Promise<TipoPagoOC | null> {
+    let q = TipoPagoOCModel.findById(id);
+    if (session) q = q.session(session);
+    const tipoPago = await q.exec();
     return tipoPago ? this.mapToEntity(tipoPago) : null;
   }
 
-  async update(id: string, data: Partial<TipoPagoOC>): Promise<TipoPagoOC | null> {
-    const updated = await TipoPagoOCModel.findByIdAndUpdate(
-      id, 
-      data, 
-      { new: true, runValidators: true }
-    ).exec();
-    return updated ? this.mapToEntity(updated) : null;
+  async update(id: string, data: Partial<TipoPagoOC>, session?: any): Promise<TipoPagoOC | null> {
+    const opts: Record<string, unknown> = { new: true, runValidators: true };
+    if (session) opts['session'] = session;
+    const updated = await TipoPagoOCModel.findByIdAndUpdate(id, data, opts as any).exec();
+    return updated ? this.mapToEntity(updated as unknown as ITipoPagoOCMongo) : null;
   }
 
   async delete(id: string): Promise<boolean> {
@@ -55,11 +55,13 @@ export class TipoPagoOCMongoRepository implements ITipoPagoOCRepository {
     return tiposPago.map(tp => this.mapToEntity(tp));
   }
 
-  async findByExpedienteAndOrden(expedienteId: string, orden: number): Promise<TipoPagoOC | null> {
-    const tipoPago = await TipoPagoOCModel.findOne({ 
-      expedienteId, 
-      orden 
-    }).exec();
+  async findByExpedienteAndOrden(expedienteId: string, orden: number, session?: any): Promise<TipoPagoOC | null> {
+    let q = TipoPagoOCModel.findOne({
+      expedienteId,
+      orden,
+    });
+    if (session) q = q.session(session);
+    const tipoPago = await q.exec();
     return tipoPago ? this.mapToEntity(tipoPago) : null;
   }
 

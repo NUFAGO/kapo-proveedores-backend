@@ -16,6 +16,13 @@ import { OrdenCompraResolver } from './OrdenCompraResolver';
 import { ExpedientePagoResolver } from './ExpedientePagoResolver';
 import { TipoPagoOCResolver } from './TipoPagoOCResolver';
 import { DocumentoOCResolver } from './DocumentoOCResolver';
+import { DocumentoSubidoResolver } from './DocumentoSubidoResolver';
+import { ProveedorResolver } from './ProveedorResolver';
+import { CodigoAccesoResolver } from './CodigoAccesoResolver';
+import { AprobacionResolver } from './AprobacionResolver';
+import { ChecklistProveedorResolver } from './ChecklistProveedorResolver';
+import { SolicitudPagoResolver } from './SolicitudPagoResolver';
+import { ReporteSolicitudPagoResolver } from './ReporteSolicitudPagoResolver';
 import { Container } from '../../di/Container';
 import { AuthService } from '../../../aplicacion/servicios/AuthService';
 import { AuthAdminService } from '../../../aplicacion/servicios/AuthAdminService';
@@ -30,6 +37,15 @@ import { OrdenCompraService } from '../../../aplicacion/servicios/OrdenCompraSer
 import { ExpedientePagoService } from '../../../dominio/servicios/ExpedientePagoService';
 import { TipoPagoOCService } from '../../../dominio/servicios/TipoPagoOCService';
 import { DocumentoOCService } from '../../../dominio/servicios/DocumentoOCService';
+import { ProveedorService } from '../../../aplicacion/servicios/ProveedorService';
+import { CodigoAccesoService } from '../../../aplicacion/servicios/CodigoAccesoService';
+import { AprobacionService } from '../../../dominio/servicios/AprobacionService';
+import { AprobacionChecklistRevisionService } from '../../../dominio/servicios/AprobacionChecklistRevisionService';
+import { AprobacionFinalizarRevisionChecklistService } from '../../../dominio/servicios/AprobacionFinalizarRevisionChecklistService';
+import { SolicitudPagoService } from '../../../dominio/servicios/SolicitudPagoService';
+import { ReporteSolicitudPagoService } from '../../../dominio/servicios/ReporteSolicitudPagoService';
+import { DocumentoSubidoService } from '../../../dominio/servicios/DocumentoSubidoService';
+import { ChecklistProveedorBatchService } from '../../../dominio/servicios/ChecklistProveedorBatchService';
 import { UsuarioProveedorMongoRepository } from '../../persistencia/mongo/UsuarioProveedorMongoRepository';
 import { TipoDocumentoMongoRepository } from '../../persistencia/mongo/TipoDocumentoMongoRepository';
 import { CategoriaChecklistMongoRepository } from '../../persistencia/mongo/CategoriaChecklistMongoRepository';
@@ -39,6 +55,11 @@ import { RequisitoDocumentoMongoRepository } from '../../persistencia/mongo/Requ
 import { DocumentoOCMongoRepository } from '../../persistencia/mongo/DocumentoOCMongoRepository';
 import { ExpedientePagoMongoRepository } from '../../persistencia/mongo/ExpedientePagoMongoRepository';
 import { TipoPagoOCMongoRepository } from '../../persistencia/mongo/TipoPagoOCMongoRepository';
+import { CodigoAccesoMongoRepository } from '../../persistencia/mongo/CodigoAccesoMongoRepository';
+import { AprobacionMongoRepository } from '../../persistencia/mongo/AprobacionMongoRepository';
+import { SolicitudPagoMongoRepository } from '../../persistencia/mongo/SolicitudPagoMongoRepository';
+import { ReporteSolicitudPagoMongoRepository } from '../../persistencia/mongo/ReporteSolicitudPagoMongoRepository';
+import { DocumentoSubidoMongoRepository } from '../../persistencia/mongo/DocumentoSubidoMongoRepository';
 import { HttpAuthRepository } from '../../persistencia/http/HttpAuthRepository';
 // import { DynamicGuardSystem } from '../../auth/DynamicGuardSystem'; // Temporalmente desactivado
 import { logger } from '../../logging/Logger';
@@ -93,6 +114,11 @@ export class ResolverFactory {
     
     // Registrar DocumentoOCMongoRepository
     container.register('DocumentoOCMongoRepository', () => new DocumentoOCMongoRepository(), true);
+
+    // Registrar SolicitudPagoMongoRepository (DocumentoSubido y otros servicios)
+    container.register('SolicitudPagoMongoRepository', () => new SolicitudPagoMongoRepository(), true);
+
+    container.register('ReporteSolicitudPagoMongoRepository', () => new ReporteSolicitudPagoMongoRepository(), true);
     
     // Registrar ExpedientePagoMongoRepository
     container.register('ExpedientePagoMongoRepository', () => new ExpedientePagoMongoRepository(), true);
@@ -121,7 +147,8 @@ export class ResolverFactory {
     container.register('DocumentoOCService', (c: any) => {
       const documentoOCRepo = c.resolve('DocumentoOCMongoRepository');
       const expedienteRepo = c.resolve('ExpedientePagoMongoRepository');
-      return new DocumentoOCService(documentoOCRepo, expedienteRepo);
+      const expedientePagoService = c.resolve('ExpedientePagoService');
+      return new DocumentoOCService(documentoOCRepo, expedienteRepo, expedientePagoService);
     }, true);
     
     // Registrar AuthService (usa HttpAuthRepository)
@@ -236,10 +263,29 @@ export class ResolverFactory {
     // Registrar OrdenCompraService
     container.register('OrdenCompraService', () => new OrdenCompraService(), true);
     
+    // Registrar ProveedorService
+    container.register('ProveedorService', () => new ProveedorService(), true);
+    
+    // Registrar CodigoAccesoMongoRepository
+    container.register('CodigoAccesoMongoRepository', () => new CodigoAccesoMongoRepository(), true);
+    
+    // Registrar CodigoAccesoService
+    container.register('CodigoAccesoService', (c: any) => {
+      const codigoAccesoRepository = c.resolve('CodigoAccesoMongoRepository');
+      const proveedorRepository = c.resolve('ProveedorService');
+      return new CodigoAccesoService(codigoAccesoRepository, proveedorRepository);
+    }, true);
+    
     // Registrar OrdenCompraResolver
     container.register('OrdenCompraResolver', (c: any) => {
       const ordenCompraService = c.resolve('OrdenCompraService');
       return new OrdenCompraResolver(ordenCompraService);
+    }, true);
+    
+    // Registrar ProveedorResolver
+    container.register('ProveedorResolver', (c: any) => {
+      const proveedorService = c.resolve('ProveedorService');
+      return new ProveedorResolver(proveedorService);
     }, true);
     
     // Registrar ExpedientePagoResolver
@@ -259,8 +305,118 @@ export class ResolverFactory {
       const documentoOCService = c.resolve('DocumentoOCService');
       return new DocumentoOCResolver(documentoOCService);
     }, true);
+
+    container.register('DocumentoSubidoResolver', (c: any) => {
+      const documentoOCRepo = c.resolve('DocumentoOCMongoRepository');
+      const solicitudPagoRepo = c.resolve('SolicitudPagoMongoRepository');
+      return new DocumentoSubidoResolver(documentoOCRepo, solicitudPagoRepo);
+    }, true);
     
-    logger.info('Container inicializado con dependencias de autenticación, usuarios proveedor, tipos de documento, categorias checklist, plantillas de documento, upload, ordenes de compra, expedientes pago, tipos pago OC, documentos OC y sus repositories MongoDB');
+    // Registrar CodigoAccesoResolver
+    container.register('CodigoAccesoResolver', (c: any) => {
+      const codigoAccesoService = c.resolve('CodigoAccesoService');
+      return new CodigoAccesoResolver(codigoAccesoService);
+    }, true);
+
+    container.register('AprobacionMongoRepository', () => new AprobacionMongoRepository(), true);
+
+    container.register('AprobacionService', (c: any) => {
+      const repo = c.resolve('AprobacionMongoRepository');
+      return new AprobacionService(repo);
+    }, true);
+
+    container.register('DocumentoSubidoMongoRepository', () => new DocumentoSubidoMongoRepository(), true);
+
+    container.register('SolicitudPagoService', (c: any) => {
+      return new SolicitudPagoService(
+        c.resolve('SolicitudPagoMongoRepository'),
+        c.resolve('TipoPagoOCMongoRepository'),
+        c.resolve('ExpedientePagoMongoRepository'),
+        c.resolve('ExpedientePagoService')
+      );
+    }, true);
+
+    container.register('SolicitudPagoResolver', (c: any) => {
+      return new SolicitudPagoResolver(
+        c.resolve('TipoPagoOCMongoRepository'),
+        c.resolve('ExpedientePagoMongoRepository'),
+        c.resolve('ExpedientePagoService')
+      );
+    }, true);
+
+    container.register('ReporteSolicitudPagoService', (c: any) => {
+      return new ReporteSolicitudPagoService(
+        c.resolve('ReporteSolicitudPagoMongoRepository'),
+        c.resolve('SolicitudPagoMongoRepository')
+      );
+    }, true);
+
+    container.register('ReporteSolicitudPagoResolver', (c: any) => {
+      return new ReporteSolicitudPagoResolver(
+        c.resolve('ReporteSolicitudPagoService'),
+        c.resolve('SolicitudPagoMongoRepository')
+      );
+    }, true);
+
+    container.register('DocumentoSubidoService', (c: any) => {
+      return new DocumentoSubidoService(
+        c.resolve('DocumentoSubidoMongoRepository'),
+        c.resolve('DocumentoOCMongoRepository'),
+        c.resolve('SolicitudPagoMongoRepository')
+      );
+    }, true);
+
+    container.register('AprobacionChecklistRevisionService', (c: any) => {
+      return new AprobacionChecklistRevisionService(
+        c.resolve('AprobacionService'),
+        c.resolve('SolicitudPagoService'),
+        c.resolve('DocumentoOCService'),
+        c.resolve('PlantillaChecklistService'),
+        c.resolve('DocumentoSubidoService'),
+        c.resolve('TipoPagoOCService')
+      );
+    }, true);
+
+    container.register('AprobacionFinalizarRevisionChecklistService', (c: any) => {
+      return new AprobacionFinalizarRevisionChecklistService(
+        c.resolve('AprobacionService'),
+        c.resolve('AprobacionChecklistRevisionService'),
+        c.resolve('SolicitudPagoService'),
+        c.resolve('DocumentoOCService'),
+        c.resolve('DocumentoSubidoService'),
+        c.resolve('ExpedientePagoMongoRepository'),
+        c.resolve('SolicitudPagoMongoRepository'),
+        c.resolve('ExpedientePagoService')
+      );
+    }, true);
+
+    container.register('AprobacionResolver', (c: any) => {
+      return new AprobacionResolver(
+        c.resolve('AprobacionService'),
+        c.resolve('AprobacionChecklistRevisionService'),
+        c.resolve('AprobacionFinalizarRevisionChecklistService'),
+        c.resolve('ExpedientePagoMongoRepository')
+      );
+    }, true);
+
+    container.register('ChecklistProveedorBatchService', (c: any) => {
+      return new ChecklistProveedorBatchService(
+        c.resolve('SolicitudPagoService'),
+        c.resolve('SolicitudPagoMongoRepository'),
+        c.resolve('DocumentoSubidoService'),
+        c.resolve('AprobacionService'),
+        c.resolve('ExpedientePagoMongoRepository'),
+        c.resolve('DocumentoOCMongoRepository'),
+        c.resolve('TipoPagoOCMongoRepository'),
+        c.resolve('ReporteSolicitudPagoMongoRepository')
+      );
+    }, true);
+
+    container.register('ChecklistProveedorResolver', (c: any) => {
+      return new ChecklistProveedorResolver(c.resolve('ChecklistProveedorBatchService'));
+    }, true);
+    
+    logger.info('Container inicializado con dependencias de autenticación, usuarios proveedor, tipos de documento, categorias checklist, plantillas de documento, upload, ordenes de compra, expedientes pago, tipos pago OC, documentos OC, documentos subidos, reportes solicitud pago, proveedores, aprobaciones, checklist proveedor batch y sus repositories MongoDB');
   }
 
   /**
@@ -322,6 +478,11 @@ export class ResolverFactory {
       resolvers.push(ordenCompraResolver.getResolvers());
       logger.debug('Resolver configurado: ordenCompra');
       
+      // Crear ProveedorResolver
+      const proveedorResolver = container.resolve<ProveedorResolver>('ProveedorResolver');
+      resolvers.push(proveedorResolver.getResolvers());
+      logger.debug('Resolver configurado: proveedor');
+      
       // Crear ExpedientePagoResolver
       const expedientePagoResolver = container.resolve<ExpedientePagoResolver>('ExpedientePagoResolver');
       resolvers.push(expedientePagoResolver.getResolvers());
@@ -336,6 +497,31 @@ export class ResolverFactory {
       const documentoOCResolver = container.resolve<DocumentoOCResolver>('DocumentoOCResolver');
       resolvers.push(documentoOCResolver.getResolvers());
       logger.debug('Resolver configurado: documentoOC');
+
+      const documentoSubidoResolver = container.resolve<DocumentoSubidoResolver>('DocumentoSubidoResolver');
+      resolvers.push(documentoSubidoResolver.getResolvers());
+      logger.debug('Resolver configurado: documentoSubido');
+      
+      // Crear CodigoAccesoResolver
+      const codigoAccesoResolver = container.resolve<CodigoAccesoResolver>('CodigoAccesoResolver');
+      resolvers.push(codigoAccesoResolver.getResolvers());
+      logger.debug('Resolver configurado: codigoAcceso');
+
+      const aprobacionResolver = container.resolve<AprobacionResolver>('AprobacionResolver');
+      resolvers.push(aprobacionResolver.getResolvers());
+      logger.debug('Resolver configurado: aprobacion');
+
+      const checklistProveedorResolver = container.resolve<ChecklistProveedorResolver>('ChecklistProveedorResolver');
+      resolvers.push(checklistProveedorResolver.getResolvers());
+      logger.debug('Resolver configurado: checklistProveedor');
+
+      const solicitudPagoResolver = container.resolve<SolicitudPagoResolver>('SolicitudPagoResolver');
+      resolvers.push(solicitudPagoResolver.getResolvers());
+      logger.debug('Resolver configurado: solicitudPago');
+
+      const reporteSolicitudPagoResolver = container.resolve<ReporteSolicitudPagoResolver>('ReporteSolicitudPagoResolver');
+      resolvers.push(reporteSolicitudPagoResolver.getResolvers());
+      logger.debug('Resolver configurado: reporteSolicitudPago');
       
       // TODO: Activar guardias dinámicas después de resolver el problema
       // const resolversConGuardias = DynamicGuardSystem.processResolvers(resolvers);

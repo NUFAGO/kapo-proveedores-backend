@@ -5,9 +5,9 @@ import { PaginationInput, PaginationResult, FilterInput, SearchInput } from '../
  */
 export interface IBaseRepository<T> {
   list(): Promise<T[]>;
-  findById(id: string): Promise<T | null>;
+  findById(id: string, session?: any): Promise<T | null>;
   create(data: Partial<T>, session?: any): Promise<T>;
-  update(id: string, data: Partial<T>): Promise<T | null>;
+  update(id: string, data: Partial<T>, session?: any): Promise<T | null>;
   delete(id: string): Promise<boolean>;
   
   // Métodos de paginación y filtros

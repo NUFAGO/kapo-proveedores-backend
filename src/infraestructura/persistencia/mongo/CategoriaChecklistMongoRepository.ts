@@ -170,4 +170,22 @@ export class CategoriaChecklistMongoRepository extends BaseMongoRepository<Categ
       throw error;
     }
   }
+
+  // MÉTODO BATCH OPTIMIZADO
+  async obtenerCategoriasPorIds(ids: string[]): Promise<CategoriaChecklist[]> {
+    try {
+      if (!ids || ids.length === 0) {
+        return [];
+      }
+
+      const docs = await CategoriaChecklistModel.find({ 
+        _id: { $in: ids } 
+      });
+
+      return docs.map(doc => this.toDomain(doc.toObject()));
+    } catch (error) {
+      console.error('Error al obtener categorías por IDs:', error);
+      throw error;
+    }
+  }
 }

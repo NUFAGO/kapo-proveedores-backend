@@ -2,26 +2,29 @@ import { ISolicitudPagoRepository } from '../repositorios/ISolicitudPagoReposito
 import { ITipoPagoOCRepository } from '../repositorios/ITipoPagoOCRepository';
 import { IExpedientePagoRepository } from '../repositorios/IExpedientePagoRepository';
 import { SolicitudPago, SolicitudPagoFilter, SolicitudPagoInput } from '../entidades/SolicitudPago';
+import type { ExpedientePagoService } from './ExpedientePagoService';
 
 export class SolicitudPagoService {
   constructor(
     private solicitudPagoRepository: ISolicitudPagoRepository,
     private tipoPagoOCRepository: ITipoPagoOCRepository,
-    private expedientePagoRepository: IExpedientePagoRepository
+    private expedientePagoRepository: IExpedientePagoRepository,
+    private expedientePagoService: ExpedientePagoService
   ) {}
 
   /**
    * Crear una nueva solicitud de pago
+   * @param session Sesión Mongo opcional (transacciones)
    */
-  async crearSolicitudPago(input: SolicitudPagoInput): Promise<SolicitudPago> {
+  async crearSolicitudPago(input: SolicitudPagoInput, session?: any): Promise<SolicitudPago> {
     // Validar que el tipo de pago exista
-    const tipoPagoOC = await this.tipoPagoOCRepository.findById(input.tipoPagoOCId);
+    const tipoPagoOC = await this.tipoPagoOCRepository.findById(input.tipoPagoOCId, session);
     if (!tipoPagoOC) {
       throw new Error('El tipo de pago especificado no existe');
     }
 
     // Validar que el expediente exista
-    const expediente = await this.expedientePagoRepository.findById(input.expedienteId);
+    const expediente = await this.expedientePagoRepository.findById(input.expedienteId, session);
     if (!expediente) {
       throw new Error('El expediente especificado no existe');
     }
@@ -53,13 +56,17 @@ export class SolicitudPagoService {
     if (tipoPagoOC.modoRestriccion === 'orden' || tipoPagoOC.modoRestriccion === 'orden_y_porcentaje') {
       if (tipoPagoOC.requiereAnteriorPagado && tipoPagoOC.orden && tipoPagoOC.orden > 1) {
         const tipoPagoAnterior = await this.tipoPagoOCRepository.findByExpedienteAndOrden(
-          input.expedienteId, 
-          tipoPagoOC.orden - 1
+          input.expedienteId,
+          tipoPagoOC.orden - 1,
+          session
         );
-        
+
         if (tipoPagoAnterior) {
-          const solicitudesAnteriores = await this.solicitudPagoRepository.findByTipoPagoOC(tipoPagoAnterior.id);
-          const algunaAprobada = solicitudesAnteriores.some(s => s.estado === 'aprobado');
+          const solicitudesAnteriores = await this.solicitudPagoRepository.findByTipoPagoOC(
+            tipoPagoAnterior.id,
+            session
+          );
+          const algunaAprobada = solicitudesAnteriores.some(s => s.estado === 'APROBADO');
           
           if (!algunaAprobada) {
             throw new Error('Debe aprobar primero el tipo de pago anterior');
@@ -68,40 +75,23 @@ export class SolicitudPagoService {
       }
     }
 
-    // Validar disponibilidad de saldo
-    const montoComprometidoTotal = await this.solicitudPagoRepository.sumMontoSolicitadoByExpedienteAndEstado(
-      input.expedienteId, 
-      'aprobado'
-    );
-    
-    const montoComprometidoPendiente = await this.solicitudPagoRepository.sumMontoSolicitadoByExpedienteAndEstado(
-      input.expedienteId, 
-      'en_revision'
-    );
-
-    const totalComprometido = montoComprometidoTotal + montoComprometidoPendiente + input.montoSolicitado;
-    
-    if (totalComprometido > expediente.montoDisponible) {
-      throw new Error('No hay saldo disponible para esta solicitud');
-    }
-
     // Crear la solicitud
     const solicitud: Omit<SolicitudPago, 'id' | 'createdAt' | 'updatedAt'> = {
       expedienteId: input.expedienteId,
       tipoPagoOCId: input.tipoPagoOCId,
       montoSolicitado: input.montoSolicitado,
-      estado: 'borrador',
+      estado: 'BORRADOR',
       fechaCreacion: new Date(),
       documentosSubidos: [] // Array vacío inicial
     };
 
-    const nuevaSolicitud = await this.solicitudPagoRepository.create(solicitud);
+    const nuevaSolicitud = await this.solicitudPagoRepository.create(solicitud, session);
 
     // Actualizar estado del expediente si es la primera solicitud
     if (expediente.estado === 'configurado') {
-      await this.expedientePagoRepository.update(input.expedienteId, { 
-        estado: 'en_ejecucion' 
-      });
+      await this.expedientePagoRepository.update(input.expedienteId, {
+        estado: 'en_ejecucion',
+      }, session);
     }
 
     return nuevaSolicitud;
@@ -146,11 +136,11 @@ export class SolicitudPagoService {
     const solicitud = await this.obtenerSolicitudPago(id);
     
     // Validar que esté en estado borrador
-    if (solicitud.estado !== 'borrador') {
+    if (solicitud.estado !== 'BORRADOR') {
       throw new Error('Solo se pueden enviar a revisión solicitudes en estado borrador');
     }
 
-    const solicitudActualizada = await this.solicitudPagoRepository.updateEstado(id, 'en_revision');
+    const solicitudActualizada = await this.solicitudPagoRepository.updateEstado(id, 'EN_REVISION');
     
     if (!solicitudActualizada) {
       throw new Error('No se pudo enviar la solicitud a revisión');
@@ -166,13 +156,13 @@ export class SolicitudPagoService {
     const solicitud = await this.obtenerSolicitudPago(id);
     
     // Validar que esté en estado en_revision
-    if (solicitud.estado !== 'en_revision') {
+    if (solicitud.estado !== 'EN_REVISION') {
       throw new Error('Solo se pueden aprobar solicitudes en estado en revisión');
     }
 
     const solicitudActualizada = await this.solicitudPagoRepository.updateEstado(
       id, 
-      'aprobado'
+      'APROBADO'
     );
 
     if (!solicitudActualizada) {
@@ -189,6 +179,10 @@ export class SolicitudPagoService {
         montoComprometido: nuevoMontoComprometido,
         montoDisponible: nuevoMontoDisponible
       });
+      await this.expedientePagoService.intentarCerrarExpedientePorCupoYDocumentosOC(
+        solicitud.expedienteId,
+        { estado: expediente.estado, montoDisponible: nuevoMontoDisponible }
+      );
     }
 
     return solicitudActualizada;
@@ -201,7 +195,7 @@ export class SolicitudPagoService {
     const solicitud = await this.obtenerSolicitudPago(id);
     
     // Validar que esté en estado en_revision
-    if (solicitud.estado !== 'en_revision') {
+    if (solicitud.estado !== 'EN_REVISION') {
       throw new Error('Solo se pueden observar solicitudes en estado en revisión');
     }
 
@@ -211,7 +205,7 @@ export class SolicitudPagoService {
 
     const solicitudActualizada = await this.solicitudPagoRepository.updateEstado(
       id, 
-      'observada', 
+      'OBSERVADA', 
       comentarios
     );
 
@@ -229,7 +223,7 @@ export class SolicitudPagoService {
     const solicitud = await this.obtenerSolicitudPago(id);
     
     // Validar que esté en estado en_revision u observada
-    if (solicitud.estado !== 'en_revision' && solicitud.estado !== 'observada') {
+    if (solicitud.estado !== 'EN_REVISION' && solicitud.estado !== 'OBSERVADA') {
       throw new Error('Solo se pueden rechazar solicitudes en estado en revisión u observada');
     }
 
@@ -239,7 +233,7 @@ export class SolicitudPagoService {
 
     const solicitudActualizada = await this.solicitudPagoRepository.updateEstado(
       id, 
-      'rechazada', 
+      'RECHAZADA', 
       comentarios
     );
 
@@ -257,7 +251,7 @@ export class SolicitudPagoService {
     const solicitud = await this.obtenerSolicitudPago(id);
     
     // Solo se pueden eliminar solicitudes en estado borrador
-    if (solicitud.estado !== 'borrador') {
+    if (solicitud.estado !== 'BORRADOR') {
       throw new Error('Solo se pueden eliminar solicitudes en estado borrador');
     }
 

@@ -5,7 +5,7 @@ export interface IDocumentoOC extends Document {
   expedienteId: string;
   checklistId: string;
   obligatorio: boolean;
-  estado: 'pendiente' | 'cargado' | 'observado' | 'aprobado' | 'rechazado';
+  estado: 'BORRADOR' | 'EN_REVISION' | 'OBSERVADA' | 'RECHAZADA' | 'APROBADO';
   fechaCarga?: Date;
   createdAt: Date;
   updatedAt: Date;
@@ -31,8 +31,8 @@ const DocumentoOCSchema = new Schema<IDocumentoOC>({
   estado: {
     type: String,
     required: true,
-    enum: ['pendiente', 'cargado', 'observado', 'aprobado', 'rechazado'],
-    default: 'pendiente'
+    enum: ['BORRADOR', 'EN_REVISION', 'OBSERVADA', 'RECHAZADA', 'APROBADO'],
+    default: 'BORRADOR',
   },
   fechaCarga: {
     type: Date
@@ -48,17 +48,5 @@ DocumentoOCSchema.index({ checklistId: 1 });
 DocumentoOCSchema.index({ estado: 1 });
 DocumentoOCSchema.index({ expedienteId: 1, estado: 1 });
 DocumentoOCSchema.index({ expedienteId: 1, checklistId: 1 }, { unique: true });
-
-// Middleware para validaciones
-DocumentoOCSchema.pre('save', function(next) {
-  // Validar que no se pueda aprobar sin estar cargado primero
-  if (this.isModified('estado') && this.estado === 'aprobado') {
-    const estadoAnterior = this.getChanges().$set?.estado || this.estado;
-    if (estadoAnterior !== 'cargado' && estadoAnterior !== 'observado') {
-      return next(new Error('Un documento debe estar cargado u observado antes de poder ser aprobado'));
-    }
-  }
-  next();
-});
 
 export const DocumentoOCModel = model<IDocumentoOC>('DocumentoOC', DocumentoOCSchema);

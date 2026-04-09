@@ -5,13 +5,13 @@ input DocumentoOCInput {
   obligatorio: Boolean!
 }
 
-# Enum para estados de DocumentoOC
+# Enum para estados de DocumentoOC (alineado con SolicitudPago; sin CARGADO)
 enum DocumentoOC_Estado {
-  PENDIENTE
-  CARGADO
-  OBSERVADO
+  BORRADOR
+  EN_REVISION
+  OBSERVADA
+  RECHAZADA
   APROBADO
-  RECHAZADO
 }
 
 input DocumentoOCFilter {

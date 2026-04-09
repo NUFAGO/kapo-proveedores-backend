@@ -146,7 +146,7 @@ export class ExpedientePagoService {
   }
 
   /**
-   * Listar expedientes con paginación y filtros
+   * Listar expedientes de pago con filtros y paginación
    */
   async listarExpedientesPago(filters: ExpedientePagoFilter): Promise<{
     data: ExpedientePago[];
@@ -168,6 +168,58 @@ export class ExpedientePagoService {
       ...result,
       totalPages: Math.ceil(result.total / limit)
     };
+  }
+
+  /**
+   * Obtener expedientes por proveedor con filtros y paginación
+   */
+  async obtenerExpedientesPorProveedor(
+    proveedorId: string, 
+    filters: ExpedientePagoFilter
+  ): Promise<{
+    data: ExpedientePago[];
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  }> {
+    try {
+      const page = filters.page || 1;
+      const limit = filters.limit || 10;
+      
+      const result = await this.expedienteRepository.listExpedientesPaginated({
+        ...filters,
+        proveedorId,
+        page,
+        limit
+      });
+
+      // Asegurarse de que siempre se retorne un array válido
+      const safeData = Array.isArray(result?.data) ? result.data : [];
+      const safeTotal = typeof result?.total === 'number' ? result.total : 0;
+
+      return {
+        data: safeData,
+        total: safeTotal,
+        page,
+        limit,
+        totalPages: Math.ceil(safeTotal / limit)
+      };
+    } catch (error) {
+      logger.error('Error en obtenerExpedientesPorProveedor', {
+        error: error instanceof Error ? error.message : String(error),
+        proveedorId,
+        filters
+      });
+      // Retornar estructura válida en caso de error
+      return {
+        data: [],
+        total: 0,
+        page: filters.page || 1,
+        limit: filters.limit || 10,
+        totalPages: 0
+      };
+    }
   }
 
   /**
@@ -492,6 +544,7 @@ export class ExpedientePagoService {
 
   /**
    * Obtener expediente completo con todas sus relaciones y archivos
+   * OPTIMIZADO: Usa consultas batch en lugar de lookups individuales
    */
   async obtenerExpedienteCompleto(id: string): Promise<any> {
     // Obtener el expediente principal
@@ -500,13 +553,13 @@ export class ExpedientePagoService {
       throw new Error('El expediente especificado no existe');
     }
 
-    // Obtener tipos de pago relacionados
-    const tiposPago = await this.tipoPagoOCRepository.findByExpedienteId(id);
+    // Obtener tipos de pago y documentos en paralelo
+    const [tiposPago, documentos] = await Promise.all([
+      this.tipoPagoOCRepository.findByExpedienteId(id),
+      this.documentoOCRepository.findByExpedienteId(id)
+    ]);
 
-    // Obtener documentos OC relacionados
-    const documentos = await this.documentoOCRepository.findByExpedienteId(id);
-
-    // Recopilar IDs unicos de categorias y checklists para hacer lookups
+    // Recopilar IDs unicos para consultas batch
     const categoriaIds = new Set<string>();
     const checklistIds = new Set<string>();
 
@@ -518,27 +571,21 @@ export class ExpedientePagoService {
       if (doc.checklistId) checklistIds.add(doc.checklistId);
     }
 
-    // Lookup real de categorias
-    const categoriasMap = new Map<string, any>();
-    for (const catId of categoriaIds) {
-      try {
-        const cat = await this.categoriaRepository.obtenerCategoriaChecklist(catId);
-        if (cat) categoriasMap.set(catId, cat);
-      } catch (e) {
-        logger.warn(`No se pudo obtener categoria ${catId}: ${e}`);
-      }
-    }
+    // CONSULTAS BATCH OPTIMIZADAS
+    const [categorias, checklists] = await Promise.all([
+      // Obtener todas las categorías en una sola consulta
+      categoriaIds.size > 0 
+        ? this.categoriaRepository.obtenerCategoriasPorIds(Array.from(categoriaIds))
+        : Promise.resolve([]),
+      // Obtener todos los checklists en una sola consulta
+      checklistIds.size > 0
+        ? this.plantillaRepository.obtenerPorIds(Array.from(checklistIds))
+        : Promise.resolve([])
+    ]);
 
-    // Lookup real de plantillas/checklists
-    const checklistsMap = new Map<string, any>();
-    for (const clId of checklistIds) {
-      try {
-        const cl = await this.plantillaRepository.obtenerPorId(clId);
-        if (cl) checklistsMap.set(clId, cl);
-      } catch (e) {
-        logger.warn(`No se pudo obtener checklist ${clId}: ${e}`);
-      }
-    }
+    // Crear mapas para lookup O(1)
+    const categoriasMap = new Map(categorias.map(cat => [cat.id, cat]));
+    const checklistsMap = new Map(checklists.map(cl => [cl.id, cl]));
 
     // Mapear al formato esperado por GraphQL
     return {
@@ -550,9 +597,75 @@ export class ExpedientePagoService {
       })),
       documentos: documentos.map(doc => ({
         ...doc,
-        estado: doc.estado ? doc.estado.toUpperCase() : 'PENDIENTE',
+        estado: doc.estado ? doc.estado.toUpperCase() : 'EN_REVISION',
         checklist: checklistsMap.get(doc.checklistId) || null
       }))
     };
+  }
+
+  /**
+   * Cierra el expediente a `completado` cuando el cupo está agotado y no quedan documentos OC pendientes.
+   *
+   * - **Solicitud de pago** (tras comprometer saldo): pasar `snapshotPostUpdate` con el
+   *   `montoDisponible` ya persistido y el `estado` previo del expediente.
+   * - **Documento OC**: no modifica saldos; sin snapshot se lee el expediente en BD (solo consulta
+   *   de `montoDisponible`). Tras `aprobarDocumentoOC`, todos los DocumentoOC del expediente deben
+   *   estar `APROBADO` para poder cerrar.
+   *
+   * Condiciones: `montoDisponible` en ~0 (tolerancia 0.02), al menos un DocumentoOC en el expediente,
+   * todos ellos `APROBADO`, y estado del expediente no en `sinAutocierre`.
+   *
+   * @param snapshotPostUpdate Opcional: evita un findById cuando el llamador acaba de persistir saldos.
+   * @param session Sesión Mongo opcional; si se pasa, lecturas y el posible `update` a `completado` usan la misma transacción.
+   */
+  async intentarCerrarExpedientePorCupoYDocumentosOC(
+    expedienteId: string,
+    snapshotPostUpdate?: Pick<ExpedientePago, 'estado' | 'montoDisponible'>,
+    session?: any
+  ): Promise<void> {
+    const sinAutocierre = new Set<ExpedientePago['estado']>([
+      'completado',
+      'cancelado',
+      'suspendido',
+      'en_configuracion',
+    ]);
+
+    let estado: ExpedientePago['estado'];
+    let montoDisponible: number;
+
+    if (snapshotPostUpdate) {
+      estado = snapshotPostUpdate.estado;
+      montoDisponible = snapshotPostUpdate.montoDisponible;
+    } else {
+      const ex = await this.expedienteRepository.findById(expedienteId, session);
+      if (!ex) return;
+      estado = ex.estado;
+      montoDisponible = ex.montoDisponible;
+    }
+
+    if (sinAutocierre.has(estado)) return;
+
+    const eps = 0.02;
+    if (montoDisponible > eps) return;
+    if (montoDisponible < -eps) return;
+
+    const docs = await this.documentoOCRepository.findByExpedienteId(expedienteId, session);
+    if (docs.length === 0) return;
+    if (docs.some((d) => d.estado !== 'APROBADO')) return;
+
+    const expedienteCerrado = await this.expedienteRepository.update(
+      expedienteId,
+      { estado: 'completado' },
+      session
+    );
+    if (!expedienteCerrado) {
+      throw new Error(
+        'No se pudo marcar el expediente como completado (cupo agotado y todos los documentos OC aprobados). La operación se revirtió.'
+      );
+    }
+    logger.info(
+      '[ExpedientePago] Expediente marcado completado: cupo agotado y todos los Documento OC aprobados',
+      { expedienteId }
+    );
   }
 }

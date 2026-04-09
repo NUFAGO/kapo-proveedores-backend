@@ -10,4 +10,6 @@ export interface ICategoriaChecklistRepository {
   obtenerCategoriasChecklistInactivas(): Promise<CategoriaChecklist[]>;
   existeNombre(nombre: string, excludeId?: string): Promise<boolean>;
   existeCategoriaChecklist(id: string): Promise<boolean>;
+  // MÉTODO BATCH OPTIMIZADO
+  obtenerCategoriasPorIds(ids: string[]): Promise<CategoriaChecklist[]>;
 }

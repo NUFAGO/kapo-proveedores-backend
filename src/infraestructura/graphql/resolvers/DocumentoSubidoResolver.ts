@@ -37,12 +37,6 @@ interface ListDocumentoSubidoArgs {
   };
 }
 
-interface UpdateEstadoDocumentoSubidoArgs {
-  id: string;
-  adminRevisorId: string;
-  comentarios?: string;
-}
-
 export class DocumentoSubidoResolver {
   private servicio: DocumentoSubidoService;
 
@@ -112,25 +106,25 @@ export class DocumentoSubidoResolver {
         }),
         
         // Aprobar un documento subido
-        aprobarDocumentoSubido: adminGuard(async (_: any, { id, adminRevisorId }: UpdateEstadoDocumentoSubidoArgs) => {
+        aprobarDocumentoSubido: adminGuard(async (_: any, { id }: { id: string }) => {
           return await ErrorHandler.handleError(
-            async () => await this.servicio.aprobarDocumentoSubido(id, adminRevisorId),
+            async () => await this.servicio.aprobarDocumentoSubido(id, ''),
             'aprobarDocumentoSubido'
           );
         }),
         
         // Observar un documento subido
-        observarDocumentoSubido: adminGuard(async (_: any, { id, adminRevisorId, comentarios }: UpdateEstadoDocumentoSubidoArgs & { comentarios: string }) => {
+        observarDocumentoSubido: adminGuard(async (_: any, { id, comentarios }: { id: string; comentarios: string }) => {
           return await ErrorHandler.handleError(
-            async () => await this.servicio.observarDocumentoSubido(id, adminRevisorId, comentarios),
+            async () => await this.servicio.observarDocumentoSubido(id, '', comentarios),
             'observarDocumentoSubido'
           );
         }),
         
         // Rechazar un documento subido
-        rechazarDocumentoSubido: adminGuard(async (_: any, { id, adminRevisorId, comentarios }: UpdateEstadoDocumentoSubidoArgs & { comentarios: string }) => {
+        rechazarDocumentoSubido: adminGuard(async (_: any, { id, comentarios }: { id: string; comentarios: string }) => {
           return await ErrorHandler.handleError(
-            async () => await this.servicio.rechazarDocumentoSubido(id, adminRevisorId, comentarios),
+            async () => await this.servicio.rechazarDocumentoSubido(id, '', comentarios),
             'rechazarDocumentoSubido'
           );
         }),

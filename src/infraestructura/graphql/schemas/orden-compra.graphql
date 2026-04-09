@@ -109,9 +109,11 @@ input OrdenCompraPaginationInput {
   estado_almacen: [String!]
   estado_comprobante: [String!]
   searchTerm: String
+  busquedaOrdenProveedor: String
   descripcion: String
   codigoCOT: String
   proveedores: [ID!]
+  proveedorBusqueda: String
   codigoRQ: String
   total: Float
   estadoPago: String

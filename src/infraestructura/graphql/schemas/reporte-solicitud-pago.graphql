@@ -1,0 +1,109 @@
+# Reporte operativo vinculado a una SolicitudPago
+
+input EvidenciaReporteSolicitudPagoInput {
+  url: String!
+}
+
+input PersonalReporteSolicitudPagoInput {
+  nombreCompleto: String!
+  cargo: String!
+  observaciones: String
+}
+
+input ActividadReporteSolicitudPagoInput {
+  actividad: String!
+  und: String!
+  tiempoHoras: Float!
+  meta: Float!
+  real: Float!
+  evidencias: [EvidenciaReporteSolicitudPagoInput!]!
+}
+
+input CuadrillaReporteSolicitudPagoInput {
+  personal: [PersonalReporteSolicitudPagoInput!]!
+  actividades: [ActividadReporteSolicitudPagoInput!]!
+  observaciones: String
+}
+
+input CrearReporteSolicitudPagoInput {
+  identificadorSolicitudPago: String!
+  fecha: DateTime!
+  maestroResponsable: String!
+  cuadrillas: [CuadrillaReporteSolicitudPagoInput!]!
+  observacionesGenerales: String
+}
+
+input ActualizarReporteSolicitudPagoInput {
+  id: ID!
+  fecha: DateTime
+  maestroResponsable: String
+  cuadrillas: [CuadrillaReporteSolicitudPagoInput!]
+  observacionesGenerales: String
+}
+
+type EvidenciaReporteSolicitudPago {
+  url: String!
+}
+
+type PersonalReporteSolicitudPago {
+  nombreCompleto: String!
+  cargo: String!
+  observaciones: String
+}
+
+type ActividadReporteSolicitudPago {
+  actividad: String!
+  und: String!
+  tiempoHoras: Float!
+  meta: Float!
+  real: Float!
+  evidencias: [EvidenciaReporteSolicitudPago!]!
+}
+
+type CuadrillaReporteSolicitudPago {
+  personal: [PersonalReporteSolicitudPago!]!
+  actividades: [ActividadReporteSolicitudPago!]!
+  observaciones: String
+}
+
+input ReporteSolicitudPagoFilter {
+  page: Int = 1
+  limit: Int = 10
+  searchTerm: String
+  vinculado: Boolean
+}
+
+type ReporteSolicitudPagoConnection {
+  data: [ReporteSolicitudPago!]!
+  total: Int!
+  page: Int!
+  limit: Int!
+  totalPages: Int!
+}
+
+type ReporteSolicitudPago {
+  id: ID!
+  codigo: String
+  proveedorId: String!
+  identificadorSolicitudPago: String
+  solicitudPagoId: String
+  fecha: DateTime!
+  maestroResponsable: String!
+  cuadrillas: [CuadrillaReporteSolicitudPago!]!
+  observacionesGenerales: String
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  solicitudPago: SolicitudPago
+}
+
+extend type Query {
+  obtenerReporteSolicitudPago(id: ID!): ReporteSolicitudPago
+  listarReportesPorSolicitudPago(solicitudPagoId: ID!): [ReporteSolicitudPago!]!
+  listarReportesSolicitudPagoPorProveedor(proveedorId: String!, filter: ReporteSolicitudPagoFilter): ReporteSolicitudPagoConnection!
+}
+
+extend type Mutation {
+  crearReporteSolicitudPago(input: CrearReporteSolicitudPagoInput!): ReporteSolicitudPago!
+  actualizarReporteSolicitudPago(input: ActualizarReporteSolicitudPagoInput!): ReporteSolicitudPago!
+  eliminarReporteSolicitudPago(id: ID!): Boolean!
+}

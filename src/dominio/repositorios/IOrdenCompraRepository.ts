@@ -16,9 +16,11 @@ export interface OrdenCompraFilter {
   estado_almacen?: string[];
   estado_comprobante?: string[];
   searchTerm?: string;
+  busquedaOrdenProveedor?: string;
   descripcion?: string;
   codigoCOT?: string;
   proveedores?: string[];
+  proveedorBusqueda?: string;
   codigoRQ?: string;
   total?: number;
   estadoPago?: string;

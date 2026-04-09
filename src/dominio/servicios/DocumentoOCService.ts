@@ -1,11 +1,14 @@
+import mongoose from 'mongoose';
 import { DocumentoOC, DocumentoOCInput, DocumentoOCFilter } from '../entidades/DocumentoOC';
 import { IDocumentoOCRepository } from '../repositorios/IDocumentoOCRepository';
 import { IExpedientePagoRepository } from '../repositorios/IExpedientePagoRepository';
+import { ExpedientePagoService } from './ExpedientePagoService';
 
 export class DocumentoOCService {
   constructor(
     private readonly documentoOCRepository: IDocumentoOCRepository,
-    private readonly expedienteRepository: IExpedientePagoRepository
+    private readonly expedienteRepository: IExpedientePagoRepository,
+    private readonly expedientePagoService: ExpedientePagoService
   ) {}
 
   /**
@@ -32,7 +35,7 @@ export class DocumentoOCService {
       expedienteId: input.expedienteId,
       checklistId: input.checklistId,
       obligatorio: input.obligatorio,
-      estado: 'pendiente'
+      estado: 'BORRADOR',
     };
 
     return await this.documentoOCRepository.create(documento);
@@ -69,9 +72,12 @@ export class DocumentoOCService {
   async subirArchivos(id: string): Promise<any> {
     const documento = await this.obtenerDocumentoOC(id);
     
-    // Validar que el documento esté en estado pendiente u observado
-    if (documento.estado !== 'pendiente' && documento.estado !== 'observado') {
-      throw new Error('Solo se pueden subir archivos a documentos en estado pendiente u observado');
+    if (
+      documento.estado !== 'BORRADOR' &&
+      documento.estado !== 'EN_REVISION' &&
+      documento.estado !== 'OBSERVADA'
+    ) {
+      throw new Error('Solo se pueden subir archivos a documentos en borrador, en revisión u observados');
     }
 
     // Crear un nuevo DocumentoSubido
@@ -87,38 +93,55 @@ export class DocumentoOCService {
     // 
     // const nuevoDocumentoSubido = await this.documentoSubidoRepository.create(documentoSubido);
     
-    // Actualizar estado del documento si es necesario
-    if (documento.estado === 'pendiente') {
-      await this.documentoOCRepository.update(id, { estado: 'cargado' });
+    if ((documento.estado === 'EN_REVISION' || documento.estado === 'BORRADOR') && !documento.fechaCarga) {
+      await this.documentoOCRepository.update(id, { fechaCarga: new Date() });
     }
 
     throw new Error('Método no implementado completamente - se necesita repositorio de DocumentoSubido');
   }
 
   /**
-   * Aprobar un documento OC
+   * Aprobar un documento OC. Persiste el estado y el posible cierre del expediente en una sola
+   * transacción Mongo; si algo falla, no queda el documento aprobado sin el resto coherente.
    */
   async aprobarDocumentoOC(id: string): Promise<DocumentoOC> {
-    const documento = await this.obtenerDocumentoOC(id);
-    
-    // Validar que el documento esté en estado cargado u observado
-    if (documento.estado !== 'cargado' && documento.estado !== 'observado') {
-      throw new Error('Solo se pueden aprobar documentos en estado cargado u observado');
+    let documentoActualizado: DocumentoOC | null = null;
+    const session = await mongoose.startSession();
+    try {
+      await session.withTransaction(async () => {
+        const documento = await this.documentoOCRepository.findById(id, session);
+        if (!documento) {
+          throw new Error('Documento OC no encontrado');
+        }
+        if (documento.estado !== 'EN_REVISION' && documento.estado !== 'OBSERVADA') {
+          throw new Error('Solo se pueden aprobar documentos en revisión u observados');
+        }
+
+        const updated = await this.documentoOCRepository.update(
+          id,
+          { estado: 'APROBADO' },
+          session
+        );
+        if (!updated) {
+          throw new Error('No se pudo aprobar el documento');
+        }
+
+        await this.expedientePagoService.intentarCerrarExpedientePorCupoYDocumentosOC(
+          updated.expedienteId,
+          undefined,
+          session
+        );
+        documentoActualizado = updated;
+      });
+    } finally {
+      await session.endSession();
     }
-
-    // TODO: Validar que el documento tenga documentos subidos aprobados
-    // if (await this.documentoSubidoRepository.countByDocumentoOCAndEstado(id, 'aprobado') === 0) {
-    //   throw new Error('No se puede aprobar un documento sin archivos aprobados');
-    // }
-
-    const documentoActualizado = await this.documentoOCRepository.update(id, {
-      estado: 'aprobado'
-    });
 
     if (!documentoActualizado) {
-      throw new Error('No se pudo aprobar el documento');
+      throw new Error(
+        'No se aplicó la aprobación del documento OC: la transacción terminó sin resultado (revisar logs del servidor).'
+      );
     }
-
     return documentoActualizado;
   }
 
@@ -131,7 +154,7 @@ export class DocumentoOCService {
 
     const documentoActualizado = await this.documentoOCRepository.updateEstado(
       id,
-      'observado'
+      'OBSERVADA'
     );
 
     if (!documentoActualizado) {
@@ -204,7 +227,7 @@ export class DocumentoOCService {
     );
 
     const documentosPendientes = documentosObligatorios.filter(
-      doc => doc.estado !== 'aprobado'
+      doc => doc.estado !== 'APROBADO'
     );
 
     return documentosPendientes.length === 0;

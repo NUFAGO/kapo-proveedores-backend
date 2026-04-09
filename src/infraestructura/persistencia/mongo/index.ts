@@ -16,6 +16,12 @@ import './schemas/DocumentoOCSchema';
 import './schemas/DocumentoSubidoSchema';
 import './schemas/TipoPagoOCSchema';
 import './schemas/SolicitudPagoSchema';
+import './schemas/ReporteSolicitudPagoSchema';
+
+// Schema para códigos de acceso
+import './schemas/CodigoAccesoSchema';
+
+import './schemas/AprobacionSchema';
 
 // Los modelos ya se registran automáticamente con mongoose.model() en cada schema
 // No necesitamos exportar nada aquí, solo asegurar que los archivos se importen
@@ -32,3 +38,6 @@ export * from './schemas/DocumentoOCSchema';
 export * from './schemas/DocumentoSubidoSchema';
 export * from './schemas/TipoPagoOCSchema';
 export * from './schemas/SolicitudPagoSchema';
+export * from './schemas/ReporteSolicitudPagoSchema';
+export * from './schemas/CodigoAccesoSchema';
+export * from './schemas/AprobacionSchema';

@@ -5,6 +5,8 @@ export interface IPlantillaChecklistDocument extends Document {
   nombre: string
   descripcion?: string
   categoriaChecklistId: string
+  /** Checklist original para versionado; la primera versión suele apuntar a sí misma. */
+  plantillaBaseId?: string
   activo: boolean
   fechaCreacion: Date
   fechaActualizacion?: Date
@@ -41,6 +43,11 @@ const PlantillaChecklistSchema = new Schema<IPlantillaChecklistDocument>({
     required: true,
     ref: 'CategoriaChecklist'
   },
+  plantillaBaseId: {
+    type: String,
+    trim: true,
+    ref: 'PlantillaChecklist'
+  },
   activo: {
     type: Boolean,
     default: true
@@ -66,6 +73,7 @@ PlantillaChecklistSchema.index({ categoriaChecklistId: 1 })
 PlantillaChecklistSchema.index({ nombre: 'text', descripcion: 'text' })
 PlantillaChecklistSchema.index({ activo: 1 })
 PlantillaChecklistSchema.index({ categoriaChecklistId: 1, activo: 1 })
+PlantillaChecklistSchema.index({ plantillaBaseId: 1 })
 
 // Middleware para generar código automático antes de guardar
 PlantillaChecklistSchema.pre('save', async function(next) {

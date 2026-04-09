@@ -1,8 +1,15 @@
-import { DocumentoSubido, DocumentoSubidoFilter } from '../entidades/DocumentoOC';
+import { DocumentoSubido, DocumentoSubidoFilter } from '../entidades/DocumentoSubido';
 
 export interface IDocumentoSubidoRepository {
   // CRUD básico
-  create(data: Omit<DocumentoSubido, 'id' | 'createdAt' | 'updatedAt'>): Promise<DocumentoSubido>;
+  create(
+    data: Omit<DocumentoSubido, 'id' | 'createdAt' | 'updatedAt'>,
+    session?: any
+  ): Promise<DocumentoSubido>;
+  createBatch(
+    data: Omit<DocumentoSubido, 'id' | 'createdAt' | 'updatedAt'>[],
+    session?: any
+  ): Promise<DocumentoSubido[]>;
   findById(id: string): Promise<DocumentoSubido | null>;
   update(id: string, data: Partial<DocumentoSubido>): Promise<DocumentoSubido | null>;
   delete(id: string): Promise<boolean>;
@@ -27,4 +34,10 @@ export interface IDocumentoSubidoRepository {
   // Métodos para obtener el último documento subido
   findUltimoByDocumentoOC(documentoOCId: string): Promise<DocumentoSubido | null>;
   findUltimoBySolicitudPago(solicitudPagoId: string): Promise<DocumentoSubido | null>;
+
+  /** Máxima versión existente para ese padre + requisito (0 si no hay filas). */
+  findMaxVersionByPadreYRequisito(
+    params: { solicitudPagoId?: string; documentoOCId?: string; requisitoDocumentoId: string },
+    session?: any
+  ): Promise<number>;
 }

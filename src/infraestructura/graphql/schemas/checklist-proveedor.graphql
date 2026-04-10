@@ -31,12 +31,9 @@ input ChecklistProveedorBatchInput {
 }
 
 type ProcesarChecklistProveedorPayload {
-  """Presente solo si context fue solicitud_pago."""
   solicitudPagoId: String
-  """Presente solo si context fue documento_oc (mismo id enviado en input, confirmado tras la transacción)."""
   documentoOCId: String
   documentosSubidosIds: [ID!]!
-  """Aprobación kanban creada en la misma transacción (entidad = solicitud o documento OC según context)."""
   aprobacionId: ID!
 }
 
@@ -44,15 +41,13 @@ type ProcesarChecklistProveedorPayload {
 input ChecklistProveedorSubsanacionInput {
   context: ChecklistProveedorContexto!
   expedienteId: String!
-  """Id de la solicitud de pago o del documento OC (debe estar observado)."""
   entidadId: String!
-  """Fila de aprobación existente (estado OBSERVADO)."""
   aprobacionId: ID!
   solicitanteId: String!
   solicitanteNombre: String!
   requisitosArchivos: [RequisitoArchivosChecklistInput!]!
-  """Solo solicitud_pago: si se envía, actualiza monto en solicitud y en la fila de aprobación. Si se omite, no se modifica el monto."""
   montoSolicitado: Float
+  reporteSolicitudPagoIds: [ID!]
 }
 
 type ProcesarChecklistSubsanacionPayload {

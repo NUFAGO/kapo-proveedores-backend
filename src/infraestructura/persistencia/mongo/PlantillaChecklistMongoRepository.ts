@@ -672,9 +672,10 @@ export class PlantillaChecklistMongoRepository extends BaseMongoRepository<Plant
           fechaActualizacion: doc.categoria.fechaActualizacion?.toISOString?.()
         } : undefined;
 
-        // Formatear requisitos
+        // Requisitos activos solamente (usado por obtenerExpedienteCompleto vía batch)
         const requisitosDomain = (doc.requisitos || [])
           .filter((req: any) => req && req._id)
+          .filter((req: any) => req.activo !== false)
           .map((req: any) => {
             // Buscar la plantilla de documento asociada
             const plantillaDocumento = req.plantillaDocumentoId && doc.plantillasDocumento

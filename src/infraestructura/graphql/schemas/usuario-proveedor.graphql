@@ -47,12 +47,30 @@ input UsuarioProveedorUpdateInput {
   estado: UsuarioProveedorEstado
 }
 
+input UsuarioProveedorListFilter {
+  page: Int = 1
+  limit: Int = 10
+  searchTerm: String
+  estado: UsuarioProveedorEstado
+  proveedor_id: String
+}
+
+type UsuarioProveedorConnection {
+  data: [UsuarioProveedor!]!
+  total: Int!
+  page: Int!
+  limit: Int!
+  totalPages: Int!
+}
+
 # ============================================================================
 # QUERIES
 # ============================================================================
 
 extend type Query {
   usuariosProveedor: [UsuarioProveedor!]!
+  """Solo admin: usuarios proveedor paginados (sin cargar todo en memoria)."""
+  usuariosProveedorPaginado(filter: UsuarioProveedorListFilter): UsuarioProveedorConnection!
   usuarioProveedor(id: ID!): UsuarioProveedor
   usuarioProveedorByDni(dni: String!): UsuarioProveedor
   usuarioProveedorByUsername(username: String!): UsuarioProveedor
@@ -66,6 +84,10 @@ extend type Query {
 extend type Mutation {
   createUsuarioProveedor(data: UsuarioProveedorInput!): UsuarioProveedor!
   updateUsuarioProveedor(id: ID!, data: UsuarioProveedorUpdateInput!): UsuarioProveedor!
+  """
+  Establece una nueva contraseña (se guarda hasheada). Admin: cualquier usuario; proveedor: solo el propio.
+  """
+  cambiarContrasenaUsuarioProveedor(id: ID!, nuevaPassword: String!): UsuarioProveedor!
   deleteUsuarioProveedor(id: ID!): UsuarioProveedor!
   cambiarEstadoUsuarioProveedor(id: ID!, estado: UsuarioProveedorEstado!): UsuarioProveedor!
 }

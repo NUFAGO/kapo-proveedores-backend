@@ -9,6 +9,8 @@ export interface TipoPagoOC {
   requiereAnteriorPagado?: boolean;
   porcentajeMaximo?: number;
   porcentajeMinimo?: number;
+  /** Si es true, el proveedor puede vincular reportes operativos a solicitudes de este tipo de pago. */
+  permiteVincularReportes?: boolean;
 }
 
 export interface TipoPagoOCInput {
@@ -20,6 +22,7 @@ export interface TipoPagoOCInput {
   requiereAnteriorPagado?: boolean;
   porcentajeMaximo?: number;
   porcentajeMinimo?: number;
+  permiteVincularReportes?: boolean;
 }
 
 export interface TipoPagoOCFilter {

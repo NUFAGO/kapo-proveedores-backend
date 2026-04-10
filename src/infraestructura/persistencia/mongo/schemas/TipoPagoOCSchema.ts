@@ -11,6 +11,7 @@ export interface ITipoPagoOC extends Document {
   requiereAnteriorPagado: boolean;
   porcentajeMaximo?: number;
   porcentajeMinimo?: number;
+  permiteVincularReportes?: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -61,6 +62,11 @@ const TipoPagoOCSchema = new Schema<ITipoPagoOC>({
     type: Number,
     min: 0,
     max: 100
+  },
+  permiteVincularReportes: {
+    type: Boolean,
+    required: false,
+    default: false
   }
 }, {
   timestamps: true,

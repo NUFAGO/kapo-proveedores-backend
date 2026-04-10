@@ -47,6 +47,14 @@ export class SolicitudPagoMongoRepository implements ISolicitudPagoRepository {
     return solicitudes.map(sol => this.mapToEntity(sol));
   }
 
+  async listTipoPagoOCIdsThatHaveSolicitudes(tipoPagoOCIds: string[]): Promise<string[]> {
+    if (tipoPagoOCIds.length === 0) return [];
+    const distinct = await SolicitudPagoModel.distinct('tipoPagoOCId', {
+      tipoPagoOCId: { $in: tipoPagoOCIds },
+    }).exec();
+    return distinct.map((id) => String(id));
+  }
+
   async listWithFilters(filters: SolicitudPagoFilter): Promise<SolicitudPago[]> {
     const query: any = {};
     

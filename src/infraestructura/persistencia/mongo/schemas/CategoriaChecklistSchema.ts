@@ -7,7 +7,6 @@ export interface CategoriaChecklistDocument {
   descripcion?: string;
   tipoUso: 'pago' | 'documentos_oc';
   permiteMultiple?: boolean; // Solo aplica si tipoUso es 'pago'
-  permiteVincularReportes?: boolean; // Solo aplica si tipoUso es 'pago'
   estado: 'activo' | 'inactivo';
   fechaCreacion: Date;
   fechaActualizacion?: Date;
@@ -33,11 +32,6 @@ const CategoriaChecklistSchema = new Schema<CategoriaChecklistDocument>({
     default: 'pago'
   },
   permiteMultiple: { 
-    type: Boolean, 
-    required: false, // Opcional, solo aplica si tipoUso es 'pago'
-    default: false 
-  },
-  permiteVincularReportes: { 
     type: Boolean, 
     required: false, // Opcional, solo aplica si tipoUso es 'pago'
     default: false 

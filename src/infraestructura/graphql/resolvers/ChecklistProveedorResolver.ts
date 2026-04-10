@@ -34,6 +34,7 @@ type ChecklistProveedorSubsanacionInputGql = {
   solicitanteNombre: string;
   requisitosArchivos: ChecklistProveedorBatchInputGql['requisitosArchivos'];
   montoSolicitado?: number | null;
+  reporteSolicitudPagoIds?: string[] | null;
 };
 
 type GqlRequisitosArchivos = ChecklistProveedorBatchInputGql['requisitosArchivos'];
@@ -137,6 +138,11 @@ export class ChecklistProveedorResolver {
                 const montoParsed =
                   montoRaw != null && Number.isFinite(Number(montoRaw)) ? Number(montoRaw) : undefined;
 
+                const reporteSolicitudPagoIds = reporteSolicitudPagoIdsForContext(
+                  input.context,
+                  input.reporteSolicitudPagoIds
+                );
+
                 return await this.batchService.procesarSubsanacion({
                   context: input.context,
                   expedienteId: input.expedienteId,
@@ -146,6 +152,7 @@ export class ChecklistProveedorResolver {
                   solicitanteNombre: input.solicitanteNombre,
                   ...(montoParsed !== undefined ? { montoSolicitado: montoParsed } : {}),
                   requisitosArchivos: mapRequisitosArchivosFromGql(input.requisitosArchivos),
+                  ...(reporteSolicitudPagoIds ? { reporteSolicitudPagoIds } : {}),
                 });
               },
               'procesarChecklistSubsanacion'

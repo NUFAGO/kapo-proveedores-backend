@@ -4,7 +4,13 @@
 
 import { BaseMongoRepository } from './BaseMongoRepository';
 import { IUsuarioProveedorRepository } from '../../../dominio/repositorios/IUsuarioProveedorRepository';
-import { UsuarioProveedor, UsuarioProveedorInput, UsuarioProveedorResponse } from '../../../dominio/entidades/UsuarioProveedor';
+import {
+  UsuarioProveedor,
+  UsuarioProveedorInput,
+  UsuarioProveedorResponse,
+  UsuarioProveedorListFilter,
+  UsuarioProveedorConnection,
+} from '../../../dominio/entidades/UsuarioProveedor';
 import { UsuarioProveedorAuth } from '../../../dominio/entidades/UsuarioProveedorAuth';
 import { UsuarioProveedorModel } from './schemas/UsuarioProveedorSchema';
 
@@ -62,6 +68,42 @@ export class UsuarioProveedorMongoRepository extends BaseMongoRepository<Usuario
   async getAllUsuariosProveedor(): Promise<UsuarioProveedorResponse[]> {
     const usuarios = await this.list();
     return usuarios.map(this.mapToResponse);
+  }
+
+  /**
+   * Listado paginado para admin (filtros opcionales)
+   */
+  async listUsuariosProveedorPaginated(filter: UsuarioProveedorListFilter): Promise<UsuarioProveedorConnection> {
+    const page = Math.max(1, filter.page ?? 1);
+    const limit = Math.min(100, Math.max(1, filter.limit ?? 10));
+    const q: Record<string, unknown> = {};
+    if (filter.proveedor_id?.trim()) {
+      q['proveedor_id'] = filter.proveedor_id.trim();
+    }
+    if (filter.estado) {
+      q['estado'] = filter.estado;
+    }
+    const search = filter.searchTerm?.trim();
+    if (search) {
+      const escaped = search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const term = new RegExp(escaped, 'i');
+      q['$or'] = [
+        { nombres: term },
+        { apellido_paterno: term },
+        { apellido_materno: term },
+        { dni: term },
+        { username: term },
+        { proveedor_nombre: term },
+      ];
+    }
+    const skip = (page - 1) * limit;
+    const [total, docs] = await Promise.all([
+      this.model.countDocuments(q).exec(),
+      this.model.find(q).sort({ fecha_creacion: -1 }).skip(skip).limit(limit).exec(),
+    ]);
+    const totalPages = total > 0 ? Math.ceil(total / limit) : 0;
+    const data = docs.map((doc: any) => this.mapToResponse(this.toDomain(doc)));
+    return { data, total, page, limit, totalPages };
   }
 
   /**
@@ -177,6 +219,20 @@ export class UsuarioProveedorMongoRepository extends BaseMongoRepository<Usuario
       throw new Error('Usuario proveedor no encontrado');
     }
 
+    return this.mapToResponse(updated);
+  }
+
+  async actualizarContrasenaUsuarioProveedor(
+    id: string,
+    passwordHasheada: string
+  ): Promise<UsuarioProveedorResponse> {
+    const updated = await this.update(id, {
+      password: passwordHasheada,
+      fecha_actualizacion: new Date(),
+    });
+    if (!updated) {
+      throw new Error('Usuario proveedor no encontrado');
+    }
     return this.mapToResponse(updated);
   }
 

@@ -2,6 +2,13 @@ import { TipoPagoOC, TipoPagoOCInput, TipoPagoOCFilter } from '../entidades/Tipo
 import { ITipoPagoOCRepository } from '../repositorios/ITipoPagoOCRepository';
 import { IExpedientePagoRepository } from '../repositorios/IExpedientePagoRepository';
 
+function porcentajeTipoPagoOmitido(value: number | null | undefined): number | undefined {
+  if (value == null || !Number.isFinite(value) || value <= 0) {
+    return undefined;
+  }
+  return Math.min(100, value);
+}
+
 export class TipoPagoOCService {
   constructor(
     private readonly tipoPagoOCRepository: ITipoPagoOCRepository,
@@ -159,7 +166,39 @@ export class TipoPagoOCService {
       }
     }
 
-    const tipoPagoActualizado = await this.tipoPagoOCRepository.update(id, input);
+    const maxNorm =
+      input.porcentajeMaximo !== undefined ? porcentajeTipoPagoOmitido(input.porcentajeMaximo) : undefined;
+    const minNorm =
+      input.porcentajeMinimo !== undefined ? porcentajeTipoPagoOmitido(input.porcentajeMinimo) : undefined;
+    const maxEfectivo =
+      maxNorm ??
+      porcentajeTipoPagoOmitido(
+        tipoPagoExistente.porcentajeMaximo !== undefined && tipoPagoExistente.porcentajeMaximo !== null
+          ? tipoPagoExistente.porcentajeMaximo
+          : NaN
+      );
+
+    const inputSanitizado: Partial<TipoPagoOCInput> = { ...input };
+    if (input.porcentajeMaximo !== undefined) {
+      if (maxNorm !== undefined) {
+        inputSanitizado.porcentajeMaximo = maxNorm;
+      } else {
+        delete inputSanitizado.porcentajeMaximo;
+      }
+      if (maxNorm === undefined) {
+        delete inputSanitizado.porcentajeMinimo;
+      }
+    }
+    if (input.porcentajeMinimo !== undefined) {
+      const minAsignado = maxEfectivo !== undefined ? minNorm : undefined;
+      if (minAsignado !== undefined) {
+        inputSanitizado.porcentajeMinimo = minAsignado;
+      } else {
+        delete inputSanitizado.porcentajeMinimo;
+      }
+    }
+
+    const tipoPagoActualizado = await this.tipoPagoOCRepository.update(id, inputSanitizado);
     if (!tipoPagoActualizado) {
       throw new Error('No se pudo actualizar el tipo de pago OC');
     }

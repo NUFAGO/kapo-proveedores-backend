@@ -3,6 +3,8 @@ input DocumentoOCInput {
   expedienteId: String!
   checklistId: String!
   obligatorio: Boolean!
+  """Si es true, el expediente marcará este documento como condición para solicitar pagos (lógica de flujo)."""
+  bloqueaSolicitudPago: Boolean
 }
 
 # Enum para estados de DocumentoOC (alineado con SolicitudPago; sin CARGADO)
@@ -19,12 +21,14 @@ input DocumentoOCFilter {
   checklistId: String
   estado: String
   obligatorio: Boolean
+  bloqueaSolicitudPago: Boolean
 }
 
 input UpdateDocumentoOCInput {
   expedienteId: String
   checklistId: String
   obligatorio: Boolean
+  bloqueaSolicitudPago: Boolean
 }
 
 # Tipos de entrada para archivos
@@ -107,6 +111,7 @@ type DocumentoOC {
   expedienteId: String!
   checklistId: String!
   obligatorio: Boolean!
+  bloqueaSolicitudPago: Boolean!
   estado: DocumentoOC_Estado!
   fechaCarga: DateTime
   

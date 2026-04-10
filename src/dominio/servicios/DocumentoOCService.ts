@@ -35,6 +35,7 @@ export class DocumentoOCService {
       expedienteId: input.expedienteId,
       checklistId: input.checklistId,
       obligatorio: input.obligatorio,
+      bloqueaSolicitudPago: input.bloqueaSolicitudPago === true,
       estado: 'BORRADOR',
     };
 

@@ -135,7 +135,6 @@ function mapChecklistRevisionGQL(plantilla: PlantillaChecklist) {
           tipoUso: plantilla.categoria.tipoUso,
           descripcion: plantilla.categoria.descripcion ?? null,
           permiteMultiple: null,
-          permiteVincularReportes: null,
           estado: 'activo',
           fechaCreacion: plantilla.categoria.fechaCreacion,
           fechaActualizacion: plantilla.categoria.fechaActualizacion ?? null,

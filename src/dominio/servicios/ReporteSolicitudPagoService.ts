@@ -6,6 +6,7 @@ import {
   ReporteSolicitudPagoCrearInput,
   ReporteSolicitudPagoCrearDesdeCliente,
   ReporteSolicitudPagoListFilter,
+  ReporteSolicitudPagoAdminListFilter,
   ReporteSolicitudPagoConnection,
 } from '../entidades/ReporteSolicitudPago';
 
@@ -87,5 +88,13 @@ export class ReporteSolicitudPagoService {
       filter,
       session
     );
+  }
+
+  /** Admin: listado paginado de todos los reportes (filtro proveedor opcional) */
+  async listarPaginadoAdmin(
+    filter: ReporteSolicitudPagoAdminListFilter,
+    session?: unknown
+  ): Promise<ReporteSolicitudPagoConnection> {
+    return await this.reporteRepository.findPaginatedAdmin(filter, session);
   }
 }

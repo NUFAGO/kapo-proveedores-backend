@@ -73,6 +73,15 @@ input ReporteSolicitudPagoFilter {
   vinculado: Boolean
 }
 
+"""Listado admin: todos los proveedores; `proveedorId` opcional para acotar."""
+input ReporteSolicitudPagoAdminFilter {
+  page: Int = 1
+  limit: Int = 10
+  searchTerm: String
+  vinculado: Boolean
+  proveedorId: String
+}
+
 type ReporteSolicitudPagoConnection {
   data: [ReporteSolicitudPago!]!
   total: Int!
@@ -100,6 +109,7 @@ extend type Query {
   obtenerReporteSolicitudPago(id: ID!): ReporteSolicitudPago
   listarReportesPorSolicitudPago(solicitudPagoId: ID!): [ReporteSolicitudPago!]!
   listarReportesSolicitudPagoPorProveedor(proveedorId: String!, filter: ReporteSolicitudPagoFilter): ReporteSolicitudPagoConnection!
+  listarReportesSolicitudPagoAdmin(filter: ReporteSolicitudPagoAdminFilter): ReporteSolicitudPagoConnection!
 }
 
 extend type Mutation {

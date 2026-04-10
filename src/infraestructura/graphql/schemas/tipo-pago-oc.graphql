@@ -8,6 +8,7 @@ input TipoPagoOCInput {
   requiereAnteriorPagado: Boolean
   porcentajeMaximo: Float
   porcentajeMinimo: Float
+  permiteVincularReportes: Boolean
 }
 
 input TipoPagoOCFilter {
@@ -26,6 +27,7 @@ input UpdateTipoPagoOCInput {
   requiereAnteriorPagado: Boolean
   porcentajeMaximo: Float
   porcentajeMinimo: Float
+  permiteVincularReportes: Boolean
 }
 
 # Tipos de entrada para validación
@@ -47,7 +49,8 @@ type TipoPagoOC {
   requiereAnteriorPagado: Boolean
   porcentajeMaximo: Float
   porcentajeMinimo: Float
-  
+  permiteVincularReportes: Boolean
+
   # Relaciones (opcional, si se necesitan)
   categoria: CategoriaChecklist
   checklist: PlantillaChecklist

@@ -11,6 +11,8 @@ export interface DocumentoOC {
   expedienteId: string;
   checklistId: string;
   obligatorio: boolean;
+  /** Si es true, el flujo podrá impedir solicitudes de pago hasta aprobar este documento (regla en capa de negocio). */
+  bloqueaSolicitudPago: boolean;
   estado: EstadoDocumentoOC;
   fechaCarga?: Date;
 }
@@ -19,6 +21,7 @@ export interface DocumentoOCInput {
   expedienteId: string;
   checklistId: string;
   obligatorio: boolean;
+  bloqueaSolicitudPago?: boolean;
 }
 
 export interface DocumentoOCFilter {
@@ -26,4 +29,5 @@ export interface DocumentoOCFilter {
   checklistId?: string;
   estado?: string;
   obligatorio?: boolean;
+  bloqueaSolicitudPago?: boolean;
 }

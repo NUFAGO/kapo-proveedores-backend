@@ -106,6 +106,8 @@ input TipoPagoConfigInput {
 
   porcentajeMinimo: Float
 
+  permiteVincularReportes: Boolean
+
 }
 
 
@@ -320,6 +322,74 @@ input ExpedienteItemInput {
 
   plantillaChecklistId: String!
 
+  """Orden del tipo de pago en el expediente (>= 1). Si se omite, usa el índice del array."""
+
+  orden: Int
+
+  """Si es null, 0 o se omite: no aplica tope por %. Solo valores > 0 se persisten."""
+
+  porcentajeMaximo: Float
+
+  """Igual que máximo: 0 o null = sin piso por %. Requiere máximo > 0 para tener sentido."""
+
+  porcentajeMinimo: Float
+
+  permiteVincularReportes: Boolean
+
+  """Solo aplica en `documentosOC`; si se omite, el documento se crea como obligatorio."""
+
+  obligatorio: Boolean
+
+  """Solo en `documentosOC`; si se omite, queda en false (no bloquea solicitudes de pago)."""
+
+  bloqueaSolicitudPago: Boolean
+
+}
+
+"""Ítem de tipo de pago al sincronizar un expediente existente (id omitido = crear)."""
+
+input ExpedienteItemActualizacionInput {
+
+  id: ID
+
+  categoriaChecklistId: String!
+
+  plantillaChecklistId: String!
+
+  orden: Int
+
+  porcentajeMaximo: Float
+
+  porcentajeMinimo: Float
+
+  permiteVincularReportes: Boolean
+
+}
+
+"""Documento OC al sincronizar expediente existente (id omitido = crear)."""
+
+input ExpedienteDocumentoActualizacionInput {
+
+  id: ID
+
+  categoriaChecklistId: String!
+
+  plantillaChecklistId: String!
+
+  obligatorio: Boolean
+
+  bloqueaSolicitudPago: Boolean
+
+}
+
+input ActualizarExpedienteItemsInput {
+
+  expedienteId: ID!
+
+  solicitudesPago: [ExpedienteItemActualizacionInput!]!
+
+  documentosOC: [ExpedienteDocumentoActualizacionInput!]!
+
 }
 
 
@@ -343,6 +413,9 @@ extend type Mutation {
   # Guardar expediente con items seleccionados (crea expediente, documentos y tipos de pago)
 
   guardarExpedienteConItems(input: GuardarExpedienteItemsInput!): ExpedientePago
+
+  
+  actualizarExpedienteItems(input: ActualizarExpedienteItemsInput!): ExpedientePago
 
   
 

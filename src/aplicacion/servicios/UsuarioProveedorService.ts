@@ -1,9 +1,17 @@
-import { UsuarioProveedorInput, UsuarioProveedorResponse } from '../../dominio/entidades/UsuarioProveedor';
+import {
+  UsuarioProveedorInput,
+  UsuarioProveedorResponse,
+  UsuarioProveedorListFilter,
+  UsuarioProveedorConnection,
+} from '../../dominio/entidades/UsuarioProveedor';
 import { UsuarioProveedorAuth } from '../../dominio/entidades/UsuarioProveedorAuth';
 import { IUsuarioProveedorRepository } from '../../dominio/repositorios/IUsuarioProveedorRepository';
 import { BaseService } from './BaseService';
 import { IBaseRepository } from '../../dominio/repositorios/IBaseRepository';
+import { ValidationException } from '../../dominio/exceptions/DomainException';
 import bcrypt from 'bcrypt';
+
+const MIN_PASSWORD_LENGTH = 6;
 
 /**
  * Servicio de usuarios proveedor que extiende BaseService para mantener consistencia
@@ -20,6 +28,12 @@ export class UsuarioProveedorService extends BaseService<UsuarioProveedorRespons
 
   async getAllUsuariosProveedor(): Promise<UsuarioProveedorResponse[]> {
     return await this.usuarioProveedorRepository.getAllUsuariosProveedor();
+  }
+
+  async listUsuariosProveedorPaginated(
+    filter: UsuarioProveedorListFilter
+  ): Promise<UsuarioProveedorConnection> {
+    return await this.usuarioProveedorRepository.listUsuariosProveedorPaginated(filter);
   }
 
   async getUsuarioProveedor(id: string): Promise<UsuarioProveedorResponse | null> {
@@ -67,6 +81,21 @@ export class UsuarioProveedorService extends BaseService<UsuarioProveedorRespons
     }
     
     return await this.usuarioProveedorRepository.updateUsuarioProveedor(id, updateData);
+  }
+
+  async cambiarContrasenaUsuarioProveedor(
+    id: string,
+    nuevaPassword: string
+  ): Promise<UsuarioProveedorResponse> {
+    const pwd = nuevaPassword?.trim() ?? '';
+    if (pwd.length < MIN_PASSWORD_LENGTH) {
+      throw new ValidationException(
+        `La contraseña debe tener al menos ${MIN_PASSWORD_LENGTH} caracteres`,
+        'nuevaPassword'
+      );
+    }
+    const hashedPassword = await bcrypt.hash(pwd, 10);
+    return await this.usuarioProveedorRepository.actualizarContrasenaUsuarioProveedor(id, hashedPassword);
   }
 
   async deleteUsuarioProveedor(id: string): Promise<UsuarioProveedorResponse> {

@@ -141,7 +141,8 @@ export class TipoPagoOCMongoRepository implements ITipoPagoOCRepository {
       ...(doc.orden && { orden: doc.orden }),
       requiereAnteriorPagado: doc.requiereAnteriorPagado,
       ...(doc.porcentajeMaximo && { porcentajeMaximo: doc.porcentajeMaximo }),
-      ...(doc.porcentajeMinimo && { porcentajeMinimo: doc.porcentajeMinimo })
+      ...(doc.porcentajeMinimo && { porcentajeMinimo: doc.porcentajeMinimo }),
+      permiteVincularReportes: doc.permiteVincularReportes === true
     };
   }
 }

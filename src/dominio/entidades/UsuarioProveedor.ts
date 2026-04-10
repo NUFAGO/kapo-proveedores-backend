@@ -38,3 +38,19 @@ export interface UsuarioProveedorResponse {
   fecha_creacion: Date;
   fecha_actualizacion: Date;
 }
+
+export interface UsuarioProveedorListFilter {
+  page?: number;
+  limit?: number;
+  searchTerm?: string;
+  estado?: 'ACTIVO' | 'PENDIENTE' | 'BLOQUEADO' | 'INACTIVO';
+  proveedor_id?: string;
+}
+
+export interface UsuarioProveedorConnection {
+  data: UsuarioProveedorResponse[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}

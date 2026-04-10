@@ -27,6 +27,16 @@ export class UsuarioProveedorResolver {
             'usuariosProveedor'
           );
         }),
+
+        usuariosProveedorPaginado: adminGuard(
+          async (_: any, { filter }: { filter?: Record<string, unknown> }) => {
+            return await ErrorHandler.handleError(
+              async () =>
+                await this.usuarioProveedorService.listUsuariosProveedorPaginated(filter ?? {}),
+              'usuariosProveedorPaginado'
+            );
+          }
+        ),
         
         // Admin puede buscar por ID, proveedor solo puede buscar el suyo
         usuarioProveedor: authGuard(async (_: any, { id }: { id: string }, context) => {
@@ -92,6 +102,26 @@ export class UsuarioProveedorResolver {
             'updateUsuarioProveedor'
           );
         }),
+
+        cambiarContrasenaUsuarioProveedor: authGuard(
+          async (
+            _: any,
+            { id, nuevaPassword }: { id: string; nuevaPassword: string },
+            context: { user?: { tipo_usuario?: string; id?: string } }
+          ) => {
+            if (context.user?.tipo_usuario === 'proveedor' && context.user?.id !== id) {
+              throw new Error(
+                'AUTORIZACION_DENEGADA: Los proveedores solo pueden cambiar la contraseña de su propia cuenta'
+              );
+            }
+
+            return await ErrorHandler.handleError(
+              async () =>
+                await this.usuarioProveedorService.cambiarContrasenaUsuarioProveedor(id, nuevaPassword),
+              'cambiarContrasenaUsuarioProveedor'
+            );
+          }
+        ),
         
         // Solo admin puede eliminar usuarios proveedor
         deleteUsuarioProveedor: adminGuard(async (_: any, { id }: { id: string }) => {

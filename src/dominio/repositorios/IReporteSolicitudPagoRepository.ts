@@ -3,6 +3,7 @@ import {
   ReporteSolicitudPagoCrearInput,
   ReporteSolicitudPagoActualizarInput,
   ReporteSolicitudPagoListFilter,
+  ReporteSolicitudPagoAdminListFilter,
   ReporteSolicitudPagoConnection,
 } from '../entidades/ReporteSolicitudPago';
 
@@ -19,6 +20,11 @@ export interface IReporteSolicitudPagoRepository {
   findPaginatedByProveedorId(
     proveedorId: string,
     filter: ReporteSolicitudPagoListFilter,
+    session?: unknown
+  ): Promise<ReporteSolicitudPagoConnection>;
+  /** Admin: todos los reportes o filtrados por proveedorId en el filtro */
+  findPaginatedAdmin(
+    filter: ReporteSolicitudPagoAdminListFilter,
     session?: unknown
   ): Promise<ReporteSolicitudPagoConnection>;
   /**

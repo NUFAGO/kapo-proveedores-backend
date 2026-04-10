@@ -4,7 +4,6 @@ type CategoriaChecklist {
   descripcion: String
   tipoUso: String!
   permiteMultiple: Boolean
-  permiteVincularReportes: Boolean
   estado: String!
   fechaCreacion: DateTime!
   fechaActualizacion: DateTime
@@ -20,7 +19,6 @@ input CategoriaChecklistInput {
   descripcion: String
   tipoUso: String!
   permiteMultiple: Boolean
-  permiteVincularReportes: Boolean
   estado: String!
 }
 

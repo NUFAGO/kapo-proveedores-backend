@@ -13,6 +13,8 @@ export interface ISolicitudPagoRepository {
   // Consultas específicas
   findByExpedienteId(expedienteId: string): Promise<SolicitudPago[]>;
   findByTipoPagoOC(tipoPagoOCId: string, session?: any): Promise<SolicitudPago[]>;
+  /** Una sola consulta: IDs de tipo de pago que tienen al menos una solicitud asociada. */
+  listTipoPagoOCIdsThatHaveSolicitudes(tipoPagoOCIds: string[]): Promise<string[]>;
   
   // Listados con filtros
   listWithFilters(filters: SolicitudPagoFilter): Promise<SolicitudPago[]>;

@@ -55,6 +55,8 @@ export interface ChecklistProveedorSubsanacionInput {
   requisitosArchivos: RequisitoArchivosChecklistProveedorInput[];
   /** Si viene informado (solo solicitud_pago), actualiza solicitud y aprobación. */
   montoSolicitado?: number;
+  /** Solo solicitud_pago: ids de reportes sin vincular a asociar a la solicitud. */
+  reporteSolicitudPagoIds?: string[];
 }
 
 export interface ProcesarChecklistSubsanacionResultado {
@@ -170,6 +172,12 @@ export class ChecklistProveedorBatchService {
     if (input.montoSolicitado != null && input.context !== 'solicitud_pago') {
       throw new Error('montoSolicitado solo aplica cuando context es solicitud_pago');
     }
+    if (
+      input.reporteSolicitudPagoIds?.length &&
+      input.context !== 'solicitud_pago'
+    ) {
+      throw new Error('reporteSolicitudPagoIds solo aplica cuando context es solicitud_pago');
+    }
 
     let montoSubsanacionSolicitud: number | undefined;
 
@@ -272,6 +280,24 @@ export class ChecklistProveedorBatchService {
             ? { montoSolicitado: montoSubsanacionSolicitud }
             : undefined
         );
+
+        if (input.context === 'solicitud_pago') {
+          const idsReportes = input.reporteSolicitudPagoIds?.filter((id) =>
+            String(id).trim().length > 0
+          );
+          if (idsReportes?.length) {
+            const expediente = await this.expedientePagoRepository.findById(input.expedienteId, session);
+            if (!expediente) {
+              throw new Error('El expediente especificado no existe');
+            }
+            await this.reporteSolicitudPagoRepository.vincularSolicitudPagoPorIds(
+              idsReportes,
+              input.entidadId,
+              expediente.proveedorId,
+              session
+            );
+          }
+        }
       });
     } finally {
       await session.endSession();

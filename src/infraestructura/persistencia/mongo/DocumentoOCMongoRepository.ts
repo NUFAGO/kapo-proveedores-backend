@@ -104,6 +104,9 @@ export class DocumentoOCMongoRepository implements IDocumentoOCRepository {
     if (filters.checklistId) query.checklistId = filters.checklistId;
     if (filters.estado) query.estado = filters.estado;
     if (filters.obligatorio !== undefined) query.obligatorio = filters.obligatorio;
+    if (filters.bloqueaSolicitudPago !== undefined) {
+      query.bloqueaSolicitudPago = filters.bloqueaSolicitudPago;
+    }
 
     const documentos = await DocumentoOCModel
       .find(query)
@@ -131,6 +134,7 @@ export class DocumentoOCMongoRepository implements IDocumentoOCRepository {
       expedienteId: doc.expedienteId,
       checklistId: doc.checklistId,
       obligatorio: doc.obligatorio,
+      bloqueaSolicitudPago: doc.bloqueaSolicitudPago === true,
       estado: doc.estado,
       ...(doc.fechaCarga && { fechaCarga: doc.fechaCarga })
     };

@@ -4,7 +4,6 @@ export interface CategoriaChecklist {
   descripcion?: string
   tipoUso: 'pago' | 'documentos_oc'
   permiteMultiple?: boolean // Solo aplica si tipoUso es 'pago'
-  permiteVincularReportes?: boolean // Solo aplica si tipoUso es 'pago'
   estado: 'activo' | 'inactivo'
   fechaCreacion: string
   fechaActualizacion?: string
@@ -15,7 +14,6 @@ export interface CategoriaChecklistInput {
   descripcion?: string
   tipoUso: 'pago' | 'documentos_oc'
   permiteMultiple?: boolean // Solo aplica si tipoUso es 'pago'
-  permiteVincularReportes?: boolean // Solo aplica si tipoUso es 'pago'
   estado: 'activo' | 'inactivo'
 }
 

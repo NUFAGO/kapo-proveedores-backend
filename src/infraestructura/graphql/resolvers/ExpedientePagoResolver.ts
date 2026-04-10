@@ -64,6 +64,8 @@ interface ConfigurarExpedienteArgs {
 
     porcentajeMinimo?: number;
 
+    permiteVincularReportes?: boolean;
+
   }>;
 
 }
@@ -102,6 +104,14 @@ interface GuardarExpedienteItemsArgs {
 
       plantillaChecklistId: string;
 
+      orden?: number | null;
+
+      porcentajeMaximo?: number | null;
+
+      porcentajeMinimo?: number | null;
+
+      permiteVincularReportes?: boolean;
+
     }>;
 
     documentosOC: Array<{
@@ -109,6 +119,52 @@ interface GuardarExpedienteItemsArgs {
       categoriaChecklistId: string;
 
       plantillaChecklistId: string;
+
+      obligatorio?: boolean | null;
+
+      bloqueaSolicitudPago?: boolean | null;
+
+    }>;
+
+  };
+
+}
+
+interface ActualizarExpedienteItemsArgs {
+
+  input: {
+
+    expedienteId: string;
+
+    solicitudesPago: Array<{
+
+      id?: string | null;
+
+      categoriaChecklistId: string;
+
+      plantillaChecklistId: string;
+
+      orden?: number | null;
+
+      porcentajeMaximo?: number | null;
+
+      porcentajeMinimo?: number | null;
+
+      permiteVincularReportes?: boolean;
+
+    }>;
+
+    documentosOC: Array<{
+
+      id?: string | null;
+
+      categoriaChecklistId: string;
+
+      plantillaChecklistId: string;
+
+      obligatorio?: boolean | null;
+
+      bloqueaSolicitudPago?: boolean | null;
 
     }>;
 
@@ -458,6 +514,30 @@ export class ExpedientePagoResolver {
             ),
 
             'guardarExpedienteConItems'
+
+          );
+
+        }),
+
+        
+
+        actualizarExpedienteItems: adminGuard(async (_: any, args: ActualizarExpedienteItemsArgs) => {
+
+          return await ErrorHandler.handleError(
+
+            async () =>
+
+              await this.servicio.actualizarExpedienteItems(
+
+                args.input.expedienteId,
+
+                args.input.solicitudesPago,
+
+                args.input.documentosOC
+
+              ),
+
+            'actualizarExpedienteItems'
 
           );
 

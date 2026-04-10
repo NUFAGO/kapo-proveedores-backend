@@ -15,7 +15,6 @@ export class CategoriaChecklistMongoRepository extends BaseMongoRepository<Categ
       descripcion: doc.descripcion,
       tipoUso: doc.tipoUso,
       permiteMultiple: doc.permiteMultiple,
-      permiteVincularReportes: doc.permiteVincularReportes,
       estado: doc.estado,
       fechaCreacion: doc.fechaCreacion.toISOString(),
       fechaActualizacion: doc.fechaActualizacion?.toISOString()
@@ -28,7 +27,6 @@ export class CategoriaChecklistMongoRepository extends BaseMongoRepository<Categ
       descripcion: input.descripcion?.trim(),
       tipoUso: input.tipoUso,
       permiteMultiple: input.permiteMultiple,
-      permiteVincularReportes: input.permiteVincularReportes,
       estado: input.estado
     });
 
@@ -54,7 +52,6 @@ export class CategoriaChecklistMongoRepository extends BaseMongoRepository<Categ
       if (input.descripcion !== undefined) updateData.descripcion = input.descripcion?.trim();
       if (input.tipoUso !== undefined) updateData.tipoUso = input.tipoUso;
       if (input.permiteMultiple !== undefined) updateData.permiteMultiple = input.permiteMultiple;
-      if (input.permiteVincularReportes !== undefined) updateData.permiteVincularReportes = input.permiteVincularReportes;
       if (input.estado !== undefined) updateData.estado = input.estado;
 
       const doc = await CategoriaChecklistModel.findByIdAndUpdate(

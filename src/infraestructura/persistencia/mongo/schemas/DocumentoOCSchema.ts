@@ -5,6 +5,7 @@ export interface IDocumentoOC extends Document {
   expedienteId: string;
   checklistId: string;
   obligatorio: boolean;
+  bloqueaSolicitudPago?: boolean;
   estado: 'BORRADOR' | 'EN_REVISION' | 'OBSERVADA' | 'RECHAZADA' | 'APROBADO';
   fechaCarga?: Date;
   createdAt: Date;
@@ -24,6 +25,11 @@ const DocumentoOCSchema = new Schema<IDocumentoOC>({
     ref: 'PlantillaChecklist'
   },
   obligatorio: {
+    type: Boolean,
+    required: true,
+    default: false
+  },
+  bloqueaSolicitudPago: {
     type: Boolean,
     required: true,
     default: false

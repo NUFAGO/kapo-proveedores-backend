@@ -5,8 +5,16 @@ import { ITipoPagoOCRepository } from '../repositorios/ITipoPagoOCRepository';
 import { IDocumentoOCRepository } from '../repositorios/IDocumentoOCRepository';
 import { ICategoriaChecklistRepository } from '../repositorios/ICategoriaChecklistRepository';
 import { IPlantillaChecklistRepository } from '../repositorios/IPlantillaChecklistRepository';
+import { ISolicitudPagoRepository } from '../repositorios/ISolicitudPagoRepository';
 import { BaseHttpRepository } from '../../infraestructura/persistencia/http/BaseHttpRepository';
 import { logger } from '../../infraestructura/logging';
+
+function porcentajeTipoPagoOmitido(value: number | null | undefined): number | undefined {
+  if (value == null || !Number.isFinite(value) || value <= 0) {
+    return undefined;
+  }
+  return Math.min(100, value);
+}
 
 class MonolithHttpRepository extends BaseHttpRepository<any> {
   async list(): Promise<any[]> {
@@ -31,7 +39,8 @@ export class ExpedientePagoService {
     private readonly tipoPagoOCRepository: ITipoPagoOCRepository,
     private readonly documentoOCRepository: IDocumentoOCRepository,
     private readonly categoriaRepository: ICategoriaChecklistRepository,
-    private readonly plantillaRepository: IPlantillaChecklistRepository
+    private readonly plantillaRepository: IPlantillaChecklistRepository,
+    private readonly solicitudPagoRepository: ISolicitudPagoRepository
   ) {
     this.httpRepository = new MonolithHttpRepository();
   }
@@ -236,6 +245,7 @@ export class ExpedientePagoService {
       requiereAnteriorPagado?: boolean;
       porcentajeMaximo?: number;
       porcentajeMinimo?: number;
+      permiteVincularReportes?: boolean;
     }>
   ): Promise<ExpedientePago> {
     // Validar que el expediente exista y esté en configuración
@@ -399,10 +409,16 @@ export class ExpedientePagoService {
     solicitudesPago: Array<{
       categoriaChecklistId: string;
       plantillaChecklistId: string;
+      orden?: number | null;
+      porcentajeMaximo?: number | null;
+      porcentajeMinimo?: number | null;
+      permiteVincularReportes?: boolean;
     }>,
     documentosOC: Array<{
       categoriaChecklistId: string;
       plantillaChecklistId: string;
+      obligatorio?: boolean | null;
+      bloqueaSolicitudPago?: boolean | null;
     }>
   ): Promise<ExpedientePago> {
     // 2. Crear el expediente con los datos proporcionados
@@ -455,12 +471,42 @@ export class ExpedientePagoService {
 
       // 3. Crear los tipos de pago (solicitudes de pago)
       for (const [index, solicitud] of solicitudesPago.entries()) {
-        const tipoPagoInput = {
+        const maxPct = porcentajeTipoPagoOmitido(solicitud.porcentajeMaximo ?? undefined);
+        let minPct = porcentajeTipoPagoOmitido(solicitud.porcentajeMinimo ?? undefined);
+        if (maxPct == null) {
+          minPct = undefined;
+        } else if (minPct != null && minPct > maxPct) {
+          minPct = maxPct;
+        }
+        const ordenSol = solicitud.orden;
+        const orden =
+          ordenSol != null && Number.isFinite(Number(ordenSol)) && Number(ordenSol) >= 1
+            ? Math.floor(Number(ordenSol))
+            : index + 1;
+
+        const tipoPagoInput: Partial<TipoPagoOC> & {
+          expedienteId: string;
+          categoriaChecklistId: string;
+          checklistId: string;
+          fechaAsignacion: Date;
+          modoRestriccion: TipoPagoOC['modoRestriccion'];
+        } = {
           expedienteId: expediente.id,
           categoriaChecklistId: solicitud.categoriaChecklistId,
           checklistId: solicitud.plantillaChecklistId,
-          modoRestriccion: 'libre' as const,
-          orden: index + 1
+          fechaAsignacion: new Date(),
+          orden,
+          requiereAnteriorPagado: false,
+          permiteVincularReportes: solicitud.permiteVincularReportes === true,
+          ...(maxPct != null
+            ? {
+                modoRestriccion: 'porcentaje' as const,
+                porcentajeMaximo: maxPct,
+                ...(minPct != null ? { porcentajeMinimo: minPct } : {})
+              }
+            : {
+                modoRestriccion: 'libre' as const
+              })
         };
         const tipoPagoCreado = await this.tipoPagoOCRepository.create(tipoPagoInput);
         tiposPagoCreados.push(tipoPagoCreado);
@@ -471,7 +517,8 @@ export class ExpedientePagoService {
         const documentoInput = {
           expedienteId: expediente.id,
           checklistId: documento.plantillaChecklistId,
-          obligatorio: true
+          obligatorio: documento.obligatorio !== false,
+          bloqueaSolicitudPago: documento.bloqueaSolicitudPago === true
         };
         const documentoCreado = await this.documentoOCRepository.create(documentoInput);
         documentosCreados.push(documentoCreado);
@@ -532,6 +579,282 @@ export class ExpedientePagoService {
   }
 
   /**
+   * Sincroniza tipos de pago y documentos OC de un expediente ya existente.
+   * No restringe por estado del expediente; la UI controla cuándo mostrar borrado.
+   * - Tipo de pago: no se elimina si tiene solicitudes asociadas.
+   * - Documento OC: se elimina de BD si deja de figurar en el input (cualquier estado).
+   */
+  async actualizarExpedienteItems(
+    expedienteId: string,
+    solicitudesPago: Array<{
+      id?: string | null;
+      categoriaChecklistId: string;
+      plantillaChecklistId: string;
+      orden?: number | null;
+      porcentajeMaximo?: number | null;
+      porcentajeMinimo?: number | null;
+      permiteVincularReportes?: boolean;
+    }>,
+    documentosOC: Array<{
+      id?: string | null;
+      categoriaChecklistId: string;
+      plantillaChecklistId: string;
+      obligatorio?: boolean | null;
+      bloqueaSolicitudPago?: boolean | null;
+    }>
+  ): Promise<ExpedientePago> {
+    const expediente = await this.expedienteRepository.findById(expedienteId);
+    if (!expediente) {
+      throw new Error('El expediente especificado no existe');
+    }
+
+    const [tiposActuales, docsActuales] = await Promise.all([
+      this.tipoPagoOCRepository.findByExpedienteId(expedienteId),
+      this.documentoOCRepository.findByExpedienteId(expedienteId),
+    ]);
+
+    const idsTiposInput = new Set(
+      solicitudesPago.map((s) => s.id).filter((x): x is string => Boolean(x))
+    );
+    const tiposAEliminar = tiposActuales.filter((t) => !idsTiposInput.has(t.id));
+
+    if (tiposAEliminar.length > 0) {
+      const idsEliminar = tiposAEliminar.map((t) => t.id);
+      const tiposConSolicitudes =
+        await this.solicitudPagoRepository.listTipoPagoOCIdsThatHaveSolicitudes(idsEliminar);
+      if (tiposConSolicitudes.length > 0) {
+        throw new Error(
+          'No se puede eliminar un tipo de pago que ya tiene solicitudes de pago asociadas'
+        );
+      }
+      await Promise.all(idsEliminar.map((id) => this.tipoPagoOCRepository.delete(id)));
+    }
+
+    const idsDocsInput = new Set(
+      documentosOC.map((d) => d.id).filter((x): x is string => Boolean(x))
+    );
+    const docsAEliminar = docsActuales.filter((d) => !idsDocsInput.has(d.id));
+
+    if (docsAEliminar.length > 0) {
+      await Promise.all(docsAEliminar.map((d) => this.documentoOCRepository.delete(d.id)));
+    }
+
+    const errDupTipoChecklist = () =>
+      new Error('Ya existe un tipo de pago con esta plantilla de checklist en el expediente');
+    const errDupDocChecklist = () =>
+      new Error('Ya existe un documento OC con esta plantilla de checklist en el expediente');
+
+    const tipoPorId = new Map<string, TipoPagoOC>(
+      tiposActuales.filter((t) => idsTiposInput.has(t.id)).map((t) => [t.id, t])
+    );
+    const checklistToTipoId = new Map<string, string>();
+    for (const t of tipoPorId.values()) {
+      if (checklistToTipoId.has(t.checklistId)) {
+        throw new Error('Estado inconsistente: duplicado de plantilla en tipos de pago del expediente');
+      }
+      checklistToTipoId.set(t.checklistId, t.id);
+    }
+
+    type FilaTipo = { mongoId: string; solicitud: (typeof solicitudesPago)[0]; ordenFinal: number };
+    const filasTipo: FilaTipo[] = [];
+
+    for (const [index, solicitud] of solicitudesPago.entries()) {
+      const ordenSol = solicitud.orden;
+      const ordenFinal =
+        ordenSol != null && Number.isFinite(Number(ordenSol)) && Number(ordenSol) >= 1
+          ? Math.floor(Number(ordenSol))
+          : index + 1;
+
+      const cid = solicitud.plantillaChecklistId;
+
+      if (solicitud.id) {
+        const existente = tipoPorId.get(solicitud.id);
+        if (!existente || existente.expedienteId !== expedienteId) {
+          throw new Error('Tipo de pago no encontrado o no pertenece al expediente');
+        }
+        const prevCid = existente.checklistId;
+        if (cid !== prevCid) {
+          const owner = checklistToTipoId.get(cid);
+          if (owner && owner !== solicitud.id) {
+            throw errDupTipoChecklist();
+          }
+          checklistToTipoId.delete(prevCid);
+          checklistToTipoId.set(cid, solicitud.id);
+        } else if (checklistToTipoId.get(cid) !== solicitud.id) {
+          throw errDupTipoChecklist();
+        }
+        filasTipo.push({ mongoId: solicitud.id, solicitud, ordenFinal });
+      } else {
+        if (checklistToTipoId.has(cid)) {
+          throw errDupTipoChecklist();
+        }
+        const maxPct = porcentajeTipoPagoOmitido(solicitud.porcentajeMaximo ?? undefined);
+        let minPct = porcentajeTipoPagoOmitido(solicitud.porcentajeMinimo ?? undefined);
+        if (maxPct == null) {
+          minPct = undefined;
+        } else if (minPct != null && minPct > maxPct) {
+          minPct = maxPct;
+        }
+
+        const tipoPagoInput: Partial<TipoPagoOC> & {
+          expedienteId: string;
+          categoriaChecklistId: string;
+          checklistId: string;
+          fechaAsignacion: Date;
+          modoRestriccion: TipoPagoOC['modoRestriccion'];
+        } = {
+          expedienteId,
+          categoriaChecklistId: solicitud.categoriaChecklistId,
+          checklistId: solicitud.plantillaChecklistId,
+          fechaAsignacion: new Date(),
+          orden: 10000 + index,
+          requiereAnteriorPagado: false,
+          permiteVincularReportes: solicitud.permiteVincularReportes === true,
+          ...(maxPct != null
+            ? {
+                modoRestriccion: 'porcentaje' as const,
+                porcentajeMaximo: maxPct,
+                ...(minPct != null ? { porcentajeMinimo: minPct } : {}),
+              }
+            : {
+                modoRestriccion: 'libre' as const,
+              }),
+        };
+        const creado = await this.tipoPagoOCRepository.create(tipoPagoInput);
+        checklistToTipoId.set(cid, creado.id);
+        tipoPorId.set(creado.id, creado);
+        filasTipo.push({ mongoId: creado.id, solicitud, ordenFinal });
+      }
+    }
+
+    await Promise.all(
+      filasTipo.map((filaTmp, i) =>
+        this.tipoPagoOCRepository.update(filaTmp.mongoId, { orden: 20000 + i })
+      )
+    );
+
+    const patchResults = await Promise.all(
+      filasTipo.map((fila) => {
+        const s = fila.solicitud;
+        const maxPct = porcentajeTipoPagoOmitido(s.porcentajeMaximo ?? undefined);
+        let minPct = porcentajeTipoPagoOmitido(s.porcentajeMinimo ?? undefined);
+        if (maxPct == null) {
+          minPct = undefined;
+        } else if (minPct != null && minPct > maxPct) {
+          minPct = maxPct;
+        }
+
+        const patch: Partial<TipoPagoOC> = {
+          categoriaChecklistId: s.categoriaChecklistId,
+          checklistId: s.plantillaChecklistId,
+          orden: fila.ordenFinal,
+          permiteVincularReportes: s.permiteVincularReportes === true,
+          requiereAnteriorPagado: false,
+        };
+
+        if (maxPct != null) {
+          patch.modoRestriccion = 'porcentaje';
+          patch.porcentajeMaximo = maxPct;
+          if (minPct != null) {
+            patch.porcentajeMinimo = minPct;
+          } else {
+            (patch as any).porcentajeMinimo = null;
+          }
+        } else {
+          patch.modoRestriccion = 'libre';
+          (patch as any).porcentajeMaximo = null;
+          (patch as any).porcentajeMinimo = null;
+        }
+
+        return this.tipoPagoOCRepository.update(fila.mongoId, patch);
+      })
+    );
+
+    if (patchResults.some((r) => !r)) {
+      throw new Error('No se pudo actualizar un tipo de pago del expediente');
+    }
+
+    const docPorId = new Map(
+      docsActuales.filter((d) => idsDocsInput.has(d.id)).map((d) => [d.id, d])
+    );
+    const checklistToDocId = new Map<string, string>();
+    for (const d of docPorId.values()) {
+      if (checklistToDocId.has(d.checklistId)) {
+        throw new Error('Estado inconsistente: duplicado de plantilla en documentos OC del expediente');
+      }
+      checklistToDocId.set(d.checklistId, d.id);
+    }
+
+    for (const docIn of documentosOC) {
+      if (docIn.id) {
+        const doc = docPorId.get(docIn.id);
+        if (!doc || doc.expedienteId !== expedienteId) {
+          throw new Error('Documento OC no encontrado o no pertenece al expediente');
+        }
+        const cid = docIn.plantillaChecklistId;
+        const prevCid = doc.checklistId;
+        if (cid !== prevCid) {
+          const owner = checklistToDocId.get(cid);
+          if (owner && owner !== docIn.id) {
+            throw errDupDocChecklist();
+          }
+          checklistToDocId.delete(prevCid);
+          checklistToDocId.set(cid, docIn.id);
+        } else if (checklistToDocId.get(cid) !== docIn.id) {
+          throw errDupDocChecklist();
+        }
+        if (doc.estado !== 'BORRADOR' && doc.checklistId !== docIn.plantillaChecklistId) {
+          throw new Error(
+            'No se puede cambiar la plantilla de un documento OC que ya no está en borrador'
+          );
+        }
+        const patchDoc: {
+          checklistId: string;
+          obligatorio?: boolean;
+          bloqueaSolicitudPago?: boolean;
+        } = {
+          checklistId: docIn.plantillaChecklistId,
+        };
+        if (typeof docIn.obligatorio === 'boolean') {
+          patchDoc.obligatorio = docIn.obligatorio;
+        }
+        if (typeof docIn.bloqueaSolicitudPago === 'boolean') {
+          patchDoc.bloqueaSolicitudPago = docIn.bloqueaSolicitudPago;
+        }
+        const actualizado = await this.documentoOCRepository.update(docIn.id, patchDoc);
+        if (!actualizado) {
+          throw new Error('No se pudo actualizar el documento OC');
+        }
+        doc.checklistId = docIn.plantillaChecklistId;
+        if (typeof docIn.obligatorio === 'boolean') {
+          doc.obligatorio = docIn.obligatorio;
+        }
+        if (typeof docIn.bloqueaSolicitudPago === 'boolean') {
+          doc.bloqueaSolicitudPago = docIn.bloqueaSolicitudPago;
+        }
+      } else {
+        if (checklistToDocId.has(docIn.plantillaChecklistId)) {
+          throw errDupDocChecklist();
+        }
+        const creado = await this.documentoOCRepository.create({
+          expedienteId,
+          checklistId: docIn.plantillaChecklistId,
+          obligatorio: docIn.obligatorio !== false,
+          bloqueaSolicitudPago: docIn.bloqueaSolicitudPago === true,
+        });
+        checklistToDocId.set(docIn.plantillaChecklistId, creado.id);
+        docPorId.set(creado.id, creado);
+      }
+    }
+
+    const expedienteRefrescado = await this.expedienteRepository.findById(expedienteId);
+    if (!expedienteRefrescado) {
+      throw new Error('No se pudo recargar el expediente tras la actualización');
+    }
+    return expedienteRefrescado;
+  }
+
+  /**
    * Obtener expediente por OC ID
    */
   async obtenerExpedientePorOcId(ocId: string): Promise<ExpedientePago> {
@@ -577,7 +900,7 @@ export class ExpedientePagoService {
       categoriaIds.size > 0 
         ? this.categoriaRepository.obtenerCategoriasPorIds(Array.from(categoriaIds))
         : Promise.resolve([]),
-      // Obtener todos los checklists en una sola consulta
+      // Checklists con requisitos ya filtrados a activos (ver PlantillaChecklistMongoRepository.obtenerPorIds)
       checklistIds.size > 0
         ? this.plantillaRepository.obtenerPorIds(Array.from(checklistIds))
         : Promise.resolve([])

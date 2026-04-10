@@ -5,6 +5,7 @@ import {
   ReporteSolicitudPagoCrearInput,
   ReporteSolicitudPagoActualizarInput,
   ReporteSolicitudPagoListFilter,
+  ReporteSolicitudPagoAdminListFilter,
   ReporteSolicitudPagoConnection,
 } from '../../../dominio/entidades/ReporteSolicitudPago';
 import {
@@ -99,11 +100,22 @@ export class ReporteSolicitudPagoMongoRepository implements IReporteSolicitudPag
     filter: ReporteSolicitudPagoListFilter,
     session?: unknown
   ): Promise<ReporteSolicitudPagoConnection> {
+    return this.findPaginatedAdmin({ ...filter, proveedorId: proveedorId.trim() }, session);
+  }
+
+  async findPaginatedAdmin(
+    filter: ReporteSolicitudPagoAdminListFilter,
+    session?: unknown
+  ): Promise<ReporteSolicitudPagoConnection> {
     const page = Math.max(1, filter.page ?? 1);
     const limit = Math.min(100, Math.max(1, filter.limit ?? 10));
     const ses = session as never;
 
-    const andParts: Record<string, unknown>[] = [{ proveedorId }];
+    const andParts: Record<string, unknown>[] = [];
+    const pid = filter.proveedorId?.trim();
+    if (pid) {
+      andParts.push({ proveedorId: pid });
+    }
     const search = filter.searchTerm?.trim();
     if (search) {
       const escaped = search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -117,6 +129,7 @@ export class ReporteSolicitudPagoMongoRepository implements IReporteSolicitudPag
           { solicitudPagoGid: term },
           { gidSolicitud: term },
           { gidsolicitud: term },
+          { proveedorId: term },
         ],
       });
     }
@@ -135,7 +148,11 @@ export class ReporteSolicitudPagoMongoRepository implements IReporteSolicitudPag
     }
 
     const baseQuery: Record<string, unknown> =
-      andParts.length === 1 ? andParts[0]! : { $and: andParts };
+      andParts.length === 0
+        ? {}
+        : andParts.length === 1
+          ? andParts[0]!
+          : { $and: andParts };
 
     const skip = (page - 1) * limit;
 

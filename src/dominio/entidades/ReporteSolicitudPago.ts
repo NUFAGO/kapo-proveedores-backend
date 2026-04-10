@@ -67,6 +67,11 @@ export interface ReporteSolicitudPagoListFilter {
   vinculado?: boolean;
 }
 
+/** Listado admin global: mismos filtros + proveedor opcional (sin filtrar = todos los proveedores) */
+export type ReporteSolicitudPagoAdminListFilter = ReporteSolicitudPagoListFilter & {
+  proveedorId?: string;
+};
+
 export interface ReporteSolicitudPagoConnection {
   data: ReporteSolicitudPago[];
   total: number;

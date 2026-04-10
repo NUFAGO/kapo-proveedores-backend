@@ -5,9 +5,11 @@ import {
   ReporteSolicitudPagoActualizarInput,
   ReporteSolicitudPagoCrearDesdeCliente,
   ReporteSolicitudPagoListFilter,
+  ReporteSolicitudPagoAdminListFilter,
 } from '../../../dominio/entidades/ReporteSolicitudPago';
 import { ErrorHandler } from './ErrorHandler';
 import {
+  adminGuard,
   authGuard,
   proveedorAccessGuard,
   proveedorGuard,
@@ -132,6 +134,14 @@ export class ReporteSolicitudPagoResolver {
             );
           },
           'proveedorId'
+        ),
+        listarReportesSolicitudPagoAdmin: adminGuard(
+          async (_: unknown, args: { filter?: ReporteSolicitudPagoAdminListFilter }) => {
+            return await ErrorHandler.handleError(
+              async () => await this.servicio.listarPaginadoAdmin(args.filter ?? {}),
+              'listarReportesSolicitudPagoAdmin'
+            );
+          }
         ),
       },
       Mutation: {

@@ -6,7 +6,8 @@ import { ITipoPagoOCRepository } from '../../../dominio/repositorios/ITipoPagoOC
 import { IExpedientePagoRepository } from '../../../dominio/repositorios/IExpedientePagoRepository';
 import { SolicitudPagoFilter } from '../../../dominio/entidades/SolicitudPago';
 import { ErrorHandler } from './ErrorHandler';
-import { adminGuard, proveedorGuard } from '../../auth/GraphQLGuards';
+import { adminGuard, authGuard, proveedorGuard, type GraphQLContext } from '../../auth/GraphQLGuards';
+import { JWTUtils } from '../../auth/JWTUtils';
 
 // Tipos para los argumentos
 interface CreateSolicitudPagoArgs {
@@ -101,13 +102,32 @@ export class SolicitudPagoResolver {
           );
         }),
         
-        // Obtener solicitudes de pago por expediente
-        obtenerSolicitudesPorExpediente: proveedorGuard(async (_: any, { expedienteId }: { expedienteId: string }) => {
-          return await ErrorHandler.handleError(
-            async () => await this.servicio.obtenerSolicitudesPorExpediente(expedienteId),
-            'obtenerSolicitudesPorExpediente'
-          );
-        }),
+        // Obtener solicitudes de pago por expediente (admin: cualquier expediente; proveedor: solo el suyo)
+        obtenerSolicitudesPorExpediente: authGuard(
+          async (_: any, { expedienteId }: { expedienteId: string }, context: GraphQLContext) => {
+            const payload = context.user;
+            if (!payload) {
+              throw new Error('AUTENTICACION_REQUERIDA: Token de autenticación requerido');
+            }
+
+            const expediente = await this.expedientePagoRepository.findById(expedienteId);
+            if (!expediente) {
+              throw new Error('El expediente especificado no existe');
+            }
+
+            if (payload.tipo_usuario === 'proveedor') {
+              if (!JWTUtils.canAccessProveedor(payload, expediente.proveedorId)) {
+                throw new Error('AUTORIZACION_DENEGADA: No tienes acceso a este expediente');
+              }
+            }
+
+            return await ErrorHandler.handleError(
+              async () => await this.servicio.obtenerSolicitudesPorExpediente(expedienteId),
+              'obtenerSolicitudesPorExpediente'
+            );
+          },
+          { allowedTypes: ['admin', 'proveedor'] }
+        ),
         
         // Obtener solicitudes de pago por tipo de pago
         obtenerSolicitudesPorTipoPago: proveedorGuard(async (_: any, { tipoPagoOCId }: { tipoPagoOCId: string }) => {

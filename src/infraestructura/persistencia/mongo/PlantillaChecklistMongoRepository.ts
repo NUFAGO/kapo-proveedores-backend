@@ -197,7 +197,6 @@ export class PlantillaChecklistMongoRepository extends BaseMongoRepository<Plant
             plantillaDocumento: plantillaDocumento ? {
               id: plantillaDocumento._id.toString(),
               codigo: plantillaDocumento.codigo,
-              tipoDocumentoId: plantillaDocumento.tipoDocumentoId,
               nombrePlantilla: plantillaDocumento.nombrePlantilla,
               plantillaUrl: plantillaDocumento.plantillaUrl,
               formatosPermitidos: plantillaDocumento.formatosPermitidos,
@@ -446,7 +445,6 @@ export class PlantillaChecklistMongoRepository extends BaseMongoRepository<Plant
               plantillaDocumento: plantillaDocumento ? {
                 id: plantillaDocumento._id.toString(),
                 codigo: plantillaDocumento.codigo,
-                tipoDocumentoId: plantillaDocumento.tipoDocumentoId,
                 nombrePlantilla: plantillaDocumento.nombrePlantilla,
                 plantillaUrl: plantillaDocumento.plantillaUrl,
                 formatosPermitidos: plantillaDocumento.formatosPermitidos,
@@ -694,7 +692,6 @@ export class PlantillaChecklistMongoRepository extends BaseMongoRepository<Plant
               plantillaDocumento: plantillaDocumento ? {
                 id: plantillaDocumento._id.toString(),
                 codigo: plantillaDocumento.codigo,
-                tipoDocumentoId: plantillaDocumento.tipoDocumentoId,
                 nombrePlantilla: plantillaDocumento.nombrePlantilla,
                 plantillaUrl: plantillaDocumento.plantillaUrl,
                 formatosPermitidos: plantillaDocumento.formatosPermitidos,

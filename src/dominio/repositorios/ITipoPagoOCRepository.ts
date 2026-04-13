@@ -3,6 +3,7 @@ import { TipoPagoOC, TipoPagoOCFilter } from '../entidades/TipoPagoOC';
 export interface ITipoPagoOCRepository {
   // Métodos básicos CRUD
   findById(id: string, session?: any): Promise<TipoPagoOC | null>;
+  findByIds(ids: string[], session?: any): Promise<TipoPagoOC[]>;
   create(data: Partial<TipoPagoOC>, session?: any): Promise<TipoPagoOC>;
   update(id: string, data: Partial<TipoPagoOC>, session?: any): Promise<TipoPagoOC | null>;
   delete(id: string): Promise<boolean>;

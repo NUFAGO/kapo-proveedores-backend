@@ -17,6 +17,8 @@ export interface SolicitudPago {
   estado: EstadoSolicitudPago;
   fechaCreacion: Date;
   documentosSubidos: DocumentoSubido[];
+  /** Id de la orden de pago en Inacons (monolito), cuando la solicitud queda vinculada a tesorería. */
+  ordenPagoVinculadoId?: string | null;
 }
 
 export interface SolicitudPagoInput {
@@ -31,4 +33,7 @@ export interface SolicitudPagoFilter {
   estado?: string;
   fechaCreacionDesde?: Date;
   fechaCreacionHasta?: Date;
+  ordenPagoVinculadoId?: string | null;
+  /** Si es true, solo solicitudes sin orden de pago Inacons vinculada (null / ausente / vacío). */
+  sinOrdenPagoVinculado?: boolean;
 }

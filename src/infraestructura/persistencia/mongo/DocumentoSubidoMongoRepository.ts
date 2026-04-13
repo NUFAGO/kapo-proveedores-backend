@@ -57,6 +57,15 @@ export class DocumentoSubidoMongoRepository implements IDocumentoSubidoRepositor
     return documentos.map(doc => this.mapToEntity(doc));
   }
 
+  async findBySolicitudPagoIds(solicitudPagoIds: string[]): Promise<DocumentoSubido[]> {
+    if (!solicitudPagoIds.length) return [];
+    const documentos = await DocumentoSubidoModel
+      .find({ solicitudPagoId: { $in: solicitudPagoIds } })
+      .sort({ fechaSubida: -1 })
+      .exec();
+    return documentos.map((doc) => this.mapToEntity(doc));
+  }
+
   async findByUsuario(usuarioId: string): Promise<DocumentoSubido[]> {
     const documentos = await DocumentoSubidoModel
       .find({ usuarioId })

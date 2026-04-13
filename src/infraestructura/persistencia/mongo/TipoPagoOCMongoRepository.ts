@@ -19,6 +19,14 @@ export class TipoPagoOCMongoRepository implements ITipoPagoOCRepository {
     return tipoPago ? this.mapToEntity(tipoPago) : null;
   }
 
+  async findByIds(ids: string[], session?: any): Promise<TipoPagoOC[]> {
+    if (!ids.length) return [];
+    let q = TipoPagoOCModel.find({ _id: { $in: ids } });
+    if (session) q = q.session(session);
+    const rows = await q.exec();
+    return rows.map((tp) => this.mapToEntity(tp));
+  }
+
   async update(id: string, data: Partial<TipoPagoOC>, session?: any): Promise<TipoPagoOC | null> {
     const opts: Record<string, unknown> = { new: true, runValidators: true };
     if (session) opts['session'] = session;

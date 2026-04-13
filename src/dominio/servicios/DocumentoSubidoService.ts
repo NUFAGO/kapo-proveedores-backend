@@ -145,6 +145,10 @@ export class DocumentoSubidoService {
     return await this.documentoSubidoRepository.findBySolicitudPago(solicitudPagoId);
   }
 
+  async obtenerDocumentosSubidosPorSolicitudPagoIds(solicitudPagoIds: string[]): Promise<DocumentoSubido[]> {
+    return await this.documentoSubidoRepository.findBySolicitudPagoIds(solicitudPagoIds);
+  }
+
   /** Mayor `version` ya persistida para ese padre + requisito (0 si no hay entregas). */
   async obtenerMaxVersionPorPadreYRequisito(
     params: { solicitudPagoId?: string; documentoOCId?: string; requisitoDocumentoId: string },

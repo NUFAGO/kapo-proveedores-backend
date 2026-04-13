@@ -61,6 +61,22 @@ export class SolicitudPagoMongoRepository implements ISolicitudPagoRepository {
     if (filters.expedienteId) query.expedienteId = filters.expedienteId;
     if (filters.tipoPagoOCId) query.tipoPagoOCId = filters.tipoPagoOCId;
     if (filters.estado) query.estado = filters.estado;
+
+    if (filters.sinOrdenPagoVinculado === true) {
+      query.$or = [
+        { ordenPagoVinculadoId: { $exists: false } },
+        { ordenPagoVinculadoId: null },
+        { ordenPagoVinculadoId: '' }
+      ];
+    } else if (filters.ordenPagoVinculadoId !== undefined && filters.ordenPagoVinculadoId !== null) {
+      query.ordenPagoVinculadoId = filters.ordenPagoVinculadoId;
+    } else if (filters.ordenPagoVinculadoId === null) {
+      query.$or = [
+        { ordenPagoVinculadoId: { $exists: false } },
+        { ordenPagoVinculadoId: null },
+        { ordenPagoVinculadoId: '' }
+      ];
+    }
     
     if (filters.fechaCreacionDesde || filters.fechaCreacionHasta) {
       query.fechaCreacion = {};
@@ -133,6 +149,7 @@ export class SolicitudPagoMongoRepository implements ISolicitudPagoRepository {
   }
 
   private mapToEntity(doc: ISolicitudPagoMongo): SolicitudPago {
+    const raw = doc as ISolicitudPagoMongo & { ordenPagoVinculadoId?: string | null };
     return {
       id: doc._id.toString(),
       expedienteId: doc.expedienteId,
@@ -140,7 +157,11 @@ export class SolicitudPagoMongoRepository implements ISolicitudPagoRepository {
       montoSolicitado: doc.montoSolicitado,
       estado: doc.estado,
       fechaCreacion: doc.fechaCreacion,
-      documentosSubidos: [] // Se poblará en el servicio si es necesario
+      documentosSubidos: [], // Se poblará en el servicio o field resolvers si aplica
+      ordenPagoVinculadoId:
+        raw.ordenPagoVinculadoId != null && String(raw.ordenPagoVinculadoId).trim() !== ''
+          ? String(raw.ordenPagoVinculadoId).trim()
+          : null
     };
   }
 }

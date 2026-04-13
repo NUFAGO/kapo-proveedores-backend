@@ -22,6 +22,8 @@ export interface IAprobacionRepository {
   crear(input: CrearAprobacionInput, session?: any): Promise<Aprobacion>;
   obtenerPorId(id: string): Promise<Aprobacion | null>;
   obtenerPorEntidad(entidadTipo: string, entidadId: string, session?: any): Promise<Aprobacion | null>;
+  /** Todas las aprobaciones para varias entidades del mismo tipo (p. ej. batch expediente completo). */
+  listarPorEntidadTipoYEntidadIds(entidadTipo: string, entidadIds: string[], session?: any): Promise<Aprobacion[]>;
   listar(filtros: AprobacionFiltros): Promise<AprobacionConnection>;
   actualizar(
     id: string,

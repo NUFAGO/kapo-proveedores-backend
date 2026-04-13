@@ -145,6 +145,18 @@ export class AprobacionMongoRepository implements IAprobacionRepository {
     return doc ? this.toDomain(doc) : null;
   }
 
+  async listarPorEntidadTipoYEntidadIds(
+    entidadTipo: string,
+    entidadIds: string[],
+    session?: any
+  ): Promise<Aprobacion[]> {
+    if (!entidadIds.length) return [];
+    let q = AprobacionModel.find({ entidadTipo, entidadId: { $in: entidadIds } });
+    if (session) q = q.session(session);
+    const docs = await q.lean().exec();
+    return docs.map((d) => this.toDomain(d));
+  }
+
   async listar(filtros: AprobacionFiltros): Promise<AprobacionConnection> {
     const { estado, expedienteId, entidadTipo, page = 1, limit = 20, offset: offsetInput } = filtros;
     const query: Record<string, unknown> = {};

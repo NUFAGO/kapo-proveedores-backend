@@ -115,6 +115,13 @@ export class TipoPagoOCService {
     return tipoPago;
   }
 
+  /** Lectura batch (sin error si falta algún id). */
+  async obtenerPorIds(ids: string[]): Promise<TipoPagoOC[]> {
+    const unique = [...new Set(ids.filter((x) => x && String(x).trim() !== ''))];
+    if (unique.length === 0) return [];
+    return this.tipoPagoOCRepository.findByIds(unique);
+  }
+
   /**
    * Listar tipos de pago OC con filtros
    */

@@ -78,6 +78,13 @@ export class AprobacionService {
     return this.repo.obtenerPorEntidad(entidadTipo, entidadId);
   }
 
+  async listarPorEntidadTipoYEntidadIds(
+    entidadTipo: string,
+    entidadIds: string[]
+  ): Promise<Aprobacion[]> {
+    return this.repo.listarPorEntidadTipoYEntidadIds(entidadTipo, entidadIds);
+  }
+
   async listar(filtros: AprobacionFiltros): Promise<AprobacionConnection> {
     return this.repo.listar(filtros);
   }

@@ -234,6 +234,14 @@ type ExpedientePagoCompleto {
 
   documentos: [DocumentoOC!]!
 
+  """Cada solicitud del expediente con el mismo detalle que `detalleChecklistRevisionAprobacion` (checklist + requisitos + documentos subidos), si existe fila de aprobación."""
+  solicitudesPagoDetalle: [SolicitudPagoConRevisionChecklist!]!
+
+}
+
+type SolicitudPagoConRevisionChecklist {
+  solicitud: SolicitudPago!
+  detalleRevisionChecklist: AprobacionChecklistRevisionDetalle
 }
 
 
@@ -263,6 +271,12 @@ extend type Query {
   # Obtener expediente completo con todas sus relaciones y archivos
 
   obtenerExpedienteCompleto(id: ID!): ExpedientePagoCompleto
+
+  """
+  Igual que `obtenerExpedienteCompleto` (mismo tipo, incluye `solicitudesPagoDetalle`), resuelto por `ocId` de la OC en Inacons.
+  Consulta sin autenticación (uso previsto: red interna / proxy del monolito).
+  """
+  obtenerExpedienteCompletoLibrePorOcId(ocId: String!): ExpedientePagoCompleto!
 
   
 

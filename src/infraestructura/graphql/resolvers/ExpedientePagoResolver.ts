@@ -10,6 +10,12 @@ import { adminGuard } from '../../auth/GraphQLGuards';
 
 import { JWTUtils } from '../../auth/JWTUtils';
 
+import { AprobacionChecklistRevisionService } from '../../../dominio/servicios/AprobacionChecklistRevisionService';
+
+import type { ISolicitudPagoRepository } from '../../../dominio/repositorios/ISolicitudPagoRepository';
+
+import { mapDetalleChecklistRevisionGQL } from './AprobacionResolver';
+
 
 
 // Definir tipos para las mutations
@@ -185,12 +191,43 @@ interface ActualizarExpedienteItemsArgs {
 export class ExpedientePagoResolver {
 
   constructor(
-
-    private readonly servicio: ExpedientePagoService
-
+    private readonly servicio: ExpedientePagoService,
+    private readonly solicitudPagoRepository: ISolicitudPagoRepository,
+    private readonly checklistRevision: AprobacionChecklistRevisionService
   ) {}
 
+  /**
+   * Añade `solicitudesPagoDetalle` (mismo detalle que `detalleChecklistRevisionAprobacion` por solicitud, si hay aprobación).
+   */
+  private async adjuntarSolicitudesPagoDetalle(
+    expedienteId: string,
+    base: Record<string, unknown>
+  ): Promise<Record<string, unknown>> {
+    const solicitudes = await this.solicitudPagoRepository.findByExpedienteId(expedienteId);
+    const detallePorSol = await this.checklistRevision.construirDetallesRevisionPorSolicitudesPago(
+      solicitudes
+    );
 
+    const solicitudesPagoDetalle = solicitudes.map((sol) => {
+      const raw = detallePorSol.get(sol.id);
+      const detalleGql = raw ? mapDetalleChecklistRevisionGQL(raw) : null;
+      return {
+        solicitud: {
+          id: sol.id,
+          expedienteId: sol.expedienteId,
+          tipoPagoOCId: sol.tipoPagoOCId,
+          montoSolicitado: sol.montoSolicitado,
+          estado: sol.estado,
+          fechaCreacion: sol.fechaCreacion,
+          documentosSubidos: sol.documentosSubidos ?? [],
+          ordenPagoVinculadoId: sol.ordenPagoVinculadoId ?? null,
+        },
+        detalleRevisionChecklist: detalleGql,
+      };
+    });
+
+    return { ...base, solicitudesPagoDetalle };
+  }
 
   getResolvers(): IResolvers {
 
@@ -278,23 +315,7 @@ export class ExpedientePagoResolver {
 
 
 
-          // Validar acceso según rol
-
-          if (payload.tipo_usuario === 'admin') {
-
-            // Admin puede acceder a cualquier expediente
-
-            return await ErrorHandler.handleError(
-
-              async () => await this.servicio.obtenerExpedienteCompleto(id),
-
-              'obtenerExpedienteCompleto'
-
-            );
-
-          } else if (payload.tipo_usuario === 'proveedor') {
-
-            // Proveedor solo puede acceder a sus expedientes
+          if (payload.tipo_usuario === 'proveedor') {
 
             if (!JWTUtils.canAccessProveedor(payload, expediente.proveedorId)) {
 
@@ -302,18 +323,27 @@ export class ExpedientePagoResolver {
 
             }
 
-            
-
-            return await ErrorHandler.handleError(
-
-              async () => await this.servicio.obtenerExpedienteCompleto(id),
-
-              'obtenerExpedienteCompleto'
-
-            );
-
           }
 
+          return await ErrorHandler.handleError(
+            async () => {
+              const base = await this.servicio.obtenerExpedienteCompleto(id);
+              return await this.adjuntarSolicitudesPagoDetalle(id, base as Record<string, unknown>);
+            },
+            'obtenerExpedienteCompleto'
+          );
+
+        },
+
+        /**
+         * Sin JWT ni cabecera de integración: mismo payload que obtenerExpedienteCompleto (incl. solicitudesPagoDetalle).
+         */
+        obtenerExpedienteCompletoLibrePorOcId: async (_: unknown, { ocId }: { ocId: string }) => {
+          return await ErrorHandler.handleError(async () => {
+            const expediente = await this.servicio.obtenerExpedientePorOcId(ocId.trim());
+            const base = await this.servicio.obtenerExpedienteCompleto(expediente.id);
+            return await this.adjuntarSolicitudesPagoDetalle(expediente.id, base as Record<string, unknown>);
+          }, 'obtenerExpedienteCompletoLibrePorOcId');
         },
 
         

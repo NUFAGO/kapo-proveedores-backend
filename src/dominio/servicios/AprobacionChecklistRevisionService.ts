@@ -6,6 +6,7 @@ import { DocumentoSubidoService } from './DocumentoSubidoService';
 import { TipoPagoOCService } from './TipoPagoOCService';
 import { PlantillaChecklist } from '../entidades/PlantillaChecklist';
 import { DocumentoSubido } from '../entidades/DocumentoSubido';
+import type { SolicitudPago } from '../entidades/SolicitudPago';
 import { EntidadTipoAprobacion, EstadoAprobacion } from '../entidades/Aprobacion';
 
 export interface AprobacionChecklistRevisionDetalle {
@@ -85,6 +86,107 @@ export class AprobacionChecklistRevisionService {
     }
 
     throw new Error(`Tipo de entidad no soportado: ${String(aprob.entidadTipo)}`);
+  }
+
+  /**
+   * Misma forma que N × `obtenerDetallePorAprobacionId`, optimizado: pocas consultas Mongo (aprobaciones, tipos pago, checklists, documentos).
+   */
+  async construirDetallesRevisionPorSolicitudesPago(
+    solicitudes: SolicitudPago[]
+  ): Promise<Map<string, AprobacionChecklistRevisionDetalle | null>> {
+    const out = new Map<string, AprobacionChecklistRevisionDetalle | null>();
+    if (solicitudes.length === 0) {
+      return out;
+    }
+
+    const solicitudIds = solicitudes.map((s) => s.id);
+
+    const aprobs = await this.aprobacionService.listarPorEntidadTipoYEntidadIds(
+      'solicitud_pago',
+      solicitudIds
+    );
+    const aprobPorEntidad = new Map<string, (typeof aprobs)[0]>();
+    for (const a of aprobs) {
+      const cur = aprobPorEntidad.get(a.entidadId);
+      if (!cur || (a.numeroCiclo ?? 0) > (cur.numeroCiclo ?? 0)) {
+        aprobPorEntidad.set(a.entidadId, a);
+      }
+    }
+
+    const tipoPagoIdsNeeded = new Set<string>();
+    for (const sol of solicitudes) {
+      const ap = aprobPorEntidad.get(sol.id);
+      const tid = ap?.tipoPagoOCId ?? sol.tipoPagoOCId;
+      if (tid) {
+        tipoPagoIdsNeeded.add(tid);
+      }
+    }
+
+    const [tipos, todosDocs] = await Promise.all([
+      this.tipoPagoOCService.obtenerPorIds([...tipoPagoIdsNeeded]),
+      this.documentoSubidoService.obtenerDocumentosSubidosPorSolicitudPagoIds(solicitudIds),
+    ]);
+
+    const tipoPorId = new Map(tipos.map((t) => [t.id, t]));
+    const docsPorSol = new Map<string, DocumentoSubido[]>();
+    for (const d of todosDocs) {
+      const sid = d.solicitudPagoId;
+      if (!sid) {
+        continue;
+      }
+      if (!docsPorSol.has(sid)) {
+        docsPorSol.set(sid, []);
+      }
+      docsPorSol.get(sid)!.push(d);
+    }
+
+    const checklistIds = [
+      ...new Set(
+        tipos.map((t) => t.checklistId).filter((cid): cid is string => Boolean(cid && String(cid).trim()))
+      ),
+    ];
+    const checklists = await this.plantillaChecklistService.obtenerConRequisitosPorIds(checklistIds);
+    const checklistPorId = new Map(checklists.map((c) => [c.id, c]));
+
+    for (const sol of solicitudes) {
+      try {
+        const aprob = aprobPorEntidad.get(sol.id);
+        if (!aprob) {
+          out.set(sol.id, null);
+          continue;
+        }
+        const tipoPagoId = aprob.tipoPagoOCId ?? sol.tipoPagoOCId;
+        const tipoPago = tipoPorId.get(tipoPagoId);
+        if (!tipoPago?.checklistId) {
+          out.set(sol.id, null);
+          continue;
+        }
+        const checklist = checklistPorId.get(tipoPago.checklistId);
+        if (!checklist) {
+          out.set(sol.id, null);
+          continue;
+        }
+        const documentosSubidos = docsPorSol.get(sol.id) ?? [];
+        out.set(sol.id, {
+          aprobacionId: aprob.id,
+          estado: aprob.estado,
+          entidadTipo: 'solicitud_pago',
+          entidadId: sol.id,
+          expedienteId: aprob.expedienteId,
+          montoSolicitado:
+            aprob.montoSolicitado !== undefined && aprob.montoSolicitado !== null
+              ? Number(aprob.montoSolicitado)
+              : sol.montoSolicitado,
+          tipoPagoOCId: tipoPagoId,
+          checklist,
+          documentosSubidos,
+        });
+      } catch {
+        out.set(sol.id, null);
+      }
+    }
+
+    return out;
   }
 
   /**

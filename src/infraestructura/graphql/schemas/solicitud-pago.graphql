@@ -20,6 +20,8 @@ input SolicitudPagoFilter {
   estado: String
   fechaCreacionDesde: DateTime
   fechaCreacionHasta: DateTime
+  ordenPagoVinculadoId: String
+  sinOrdenPagoVinculado: Boolean
 }
 
 # Tipos de entrada para aprobación/observación
@@ -46,6 +48,8 @@ type SolicitudPago {
   estado: SolicitudPago_Estado!
   fechaCreacion: DateTime!
   documentosSubidos: [DocumentoSubido!]!
+  """Id de orden de pago en Inacons cuando la solicitud quedó vinculada a tesorería."""
+  ordenPagoVinculadoId: String
   
   # Relaciones
   expediente: ExpedientePago

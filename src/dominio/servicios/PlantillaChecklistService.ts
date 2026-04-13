@@ -40,6 +40,13 @@ export class PlantillaChecklistService {
     return await this.plantillaRepository.obtenerConRequisitos(id)
   }
 
+  /** Varias plantillas con requisitos en una sola agregación (mismo pipeline que `obtenerPorIds` en repo). */
+  async obtenerConRequisitosPorIds(ids: string[]): Promise<PlantillaChecklist[]> {
+    const unique = [...new Set(ids.filter((x) => x && String(x).trim() !== ''))];
+    if (unique.length === 0) return [];
+    return this.plantillaRepository.obtenerPorIds(unique);
+  }
+
   async actualizar(id: string, input: Partial<PlantillaChecklistInput>): Promise<PlantillaChecklist | null> {
     const existente = await this.plantillaRepository.obtenerPorId(id)
     if (!existente) {

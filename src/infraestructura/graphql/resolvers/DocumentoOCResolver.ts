@@ -14,27 +14,26 @@ interface UpdateDocumentoOCArgs {
   input: Partial<DocumentoOCInput>;
 }
 
-interface SubirArchivosArgs {
-  id: string;
-  archivos: Array<{
-    url: string;
-    nombreOriginal: string;
-    mimeType: string;
-    tamanioBytes: number;
-    fechaSubida: string;
-  }>;
-  usuarioId: string;
+interface SubirArchivosMutationArgs {
+  input: {
+    id: string;
+    archivos: Array<{
+      url: string;
+      nombreOriginal: string;
+      mimeType: string;
+      tamanioBytes: number;
+      fechaSubida: string;
+    }>;
+    usuarioId: string;
+  };
 }
 
-interface AprobarDocumentoArgs {
-  id: string;
-  adminRevisorId: string;
+interface AprobarDocumentoMutationArgs {
+  input: { id: string };
 }
 
-interface ObservarDocumentoArgs {
-  id: string;
-  adminRevisorId: string;
-  comentarios: string;
+interface ObservarDocumentoMutationArgs {
+  input: { id: string; comentarios: string };
 }
 
 /**
@@ -58,9 +57,9 @@ export class DocumentoOCResolver {
         }),
         
         // Listar documentos OC con filtros
-        listarDocumentosOC: adminGuard(async (_: any, args: DocumentoOCFilter) => {
+        listarDocumentosOC: adminGuard(async (_: any, { filter }: { filter?: DocumentoOCFilter }) => {
           return await ErrorHandler.handleError(
-            async () => await this.servicio.listarDocumentosOC(args),
+            async () => await this.servicio.listarDocumentosOC(filter ?? {}),
             'listarDocumentosOC'
           );
         }),
@@ -100,25 +99,25 @@ export class DocumentoOCResolver {
         }),
         
         // Subir archivos a un documento OC
-        subirArchivosDocumento: adminGuard(async (_: any, args: SubirArchivosArgs) => {
+        subirArchivosDocumento: adminGuard(async (_: any, { input }: SubirArchivosMutationArgs) => {
           return await ErrorHandler.handleError(
-            async () => await this.servicio.subirArchivos(args.id),
+            async () => await this.servicio.subirArchivos(input.id),
             'subirArchivosDocumento'
           );
         }),
         
         // Aprobar un documento OC
-        aprobarDocumentoOC: adminGuard(async (_: any, { id }: AprobarDocumentoArgs) => {
+        aprobarDocumentoOC: adminGuard(async (_: any, { input }: AprobarDocumentoMutationArgs) => {
           return await ErrorHandler.handleError(
-            async () => await this.servicio.aprobarDocumentoOC(id),
+            async () => await this.servicio.aprobarDocumentoOC(input.id),
             'aprobarDocumentoOC'
           );
         }),
         
         // Observar un documento OC
-        observarDocumentoOC: adminGuard(async (_: any, { id }: ObservarDocumentoArgs) => {
+        observarDocumentoOC: adminGuard(async (_: any, { input }: ObservarDocumentoMutationArgs) => {
           return await ErrorHandler.handleError(
-            async () => await this.servicio.observarDocumentoOC(id),
+            async () => await this.servicio.observarDocumentoOC(input.id),
             'observarDocumentoOC'
           );
         }),

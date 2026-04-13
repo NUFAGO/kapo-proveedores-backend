@@ -1,3 +1,4 @@
+import { randomUUID } from "crypto";
 import { getBucket } from "../../infraestructura/config/googleCloudStorage";
 import sharp from "sharp";
 
@@ -79,42 +80,11 @@ export class FileUploadService {
       // Validaciones
       this.validateFile(mimetype, file, config);
 
-      // Usar nombre original, pero si ya existe agregar (1), (2), etc.
+      // Ruta en GCS: UUID por subida evita condiciones de carrera en lotes paralelos
       let fileName = filename;
-      
-      // Verificar si ya existe el archivo y agregar número si es necesario
       if (config.generateUniqueNames !== false) {
-        const bucket = getBucket();
-        const originalPath = `${config.folder}/${fileName}`;
-        
-        try {
-          // Verificar si el archivo ya existe
-          const [exists] = await bucket.file(originalPath).exists();
-          
-          if (exists) {
-            // Extraer nombre y extensión
-            const lastDotIndex = fileName.lastIndexOf('.');
-            const nameWithoutExt = lastDotIndex > 0 ? fileName.substring(0, lastDotIndex) : fileName;
-            const extension = lastDotIndex > 0 ? fileName.substring(lastDotIndex) : '';
-            
-            // Buscar el siguiente número disponible
-            let counter = 1;
-            let newFileName;
-            let fileExists;
-            
-            do {
-              newFileName = `${nameWithoutExt}(${counter})${extension}`;
-              const newPath = `${config.folder}/${newFileName}`;
-              [fileExists] = await bucket.file(newPath).exists();
-              counter++;
-            } while (fileExists);
-            
-            fileName = newFileName;
-          }
-        } catch (error) {
-          // Si hay error al verificar existencia, usar nombre original
-          console.warn('Error al verificar existencia de archivo:', error);
-        }
+        const safeOriginal = this.sanitizeStorageFileName(filename) || "file";
+        fileName = `${randomUUID()}_${safeOriginal}`;
       }
 
       const fullPath = `${config.folder}/${fileName}`;
@@ -145,7 +115,7 @@ export class FileUploadService {
   static async uploadMultipleGraphQLFiles(
     files: any[],
     config: FileUploadConfig,
-    batchSize: number = 3
+    batchSize: number = 10
   ): Promise<BatchUploadResult> {
     const successful: UploadResult[] = [];
     const failed: Array<{ file: any; error: string }> = [];
@@ -238,6 +208,12 @@ export class FileUploadService {
   }
 
   // Métodos privados auxiliares
+
+  /** Evita separadores de ruta y caracteres problemáticos en la clave del objeto. */
+  private static sanitizeStorageFileName(name: string): string {
+    const base = name.replace(/[/\\]/g, "_").replace(/\0/g, "");
+    return base.length > 200 ? base.slice(0, 200) : base;
+  }
 
   private static validateFile(mimetype: string, file: any, config: FileUploadConfig): void {
     // Validar tipos MIME permitidos

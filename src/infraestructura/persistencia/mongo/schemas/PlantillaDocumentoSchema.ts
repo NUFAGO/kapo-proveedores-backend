@@ -4,7 +4,6 @@ import { Schema, model } from 'mongoose';
 export interface PlantillaDocumentoDocument {
   _id: string;
   codigo: string;
-  tipoDocumentoId: string;
   nombrePlantilla: string;
   plantillaUrl: string;
   formatosPermitidos?: string;
@@ -21,17 +20,12 @@ const PlantillaDocumentoSchema = new Schema<PlantillaDocumentoDocument>({
     uppercase: true,
     trim: true
   },
-  tipoDocumentoId: { 
-    type: String, 
-    required: true, 
-    trim: true,
-    ref: 'TipoDocumento'
-  },
   nombrePlantilla: { 
     type: String, 
     required: true, 
     trim: true,
-    maxlength: 200
+    maxlength: 200,
+    unique: true
   },
   plantillaUrl: { 
     type: String, 
@@ -88,9 +82,6 @@ PlantillaDocumentoSchema.pre(['updateOne', 'updateMany', 'findOneAndUpdate'], fu
 });
 
 // Índices
-PlantillaDocumentoSchema.index({ tipoDocumentoId: 1 });
-PlantillaDocumentoSchema.index({ tipoDocumentoId: 1, nombrePlantilla: 1 }, { unique: true });
 PlantillaDocumentoSchema.index({ activo: 1 });
-PlantillaDocumentoSchema.index({ tipoDocumentoId: 1, activo: 1 });
 
 export const PlantillaDocumentoModel = model<PlantillaDocumentoDocument>('PlantillaDocumento', PlantillaDocumentoSchema);

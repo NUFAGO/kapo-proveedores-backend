@@ -12,7 +12,6 @@ export class PlantillaDocumentoMongoRepository extends BaseMongoRepository<Plant
     return {
       id: doc._id.toString(),
       codigo: doc.codigo,
-      tipoDocumentoId: doc.tipoDocumentoId,
       nombrePlantilla: doc.nombrePlantilla,
       plantillaUrl: doc.plantillaUrl,
       formatosPermitidos: doc.formatosPermitidos || null,
@@ -27,7 +26,6 @@ export class PlantillaDocumentoMongoRepository extends BaseMongoRepository<Plant
     
     const newPlantillaDocumento = new PlantillaDocumentoModel({
       codigo,
-      tipoDocumentoId: input.tipoDocumentoId.trim(),
       nombrePlantilla: input.nombrePlantilla.trim(),
       plantillaUrl: input.plantillaUrl.trim(),
       formatosPermitidos: input.formatosPermitidos?.trim() || null,
@@ -52,7 +50,6 @@ export class PlantillaDocumentoMongoRepository extends BaseMongoRepository<Plant
     try {
       const updateData: any = {};
       
-      if (input.tipoDocumentoId !== undefined) updateData.tipoDocumentoId = input.tipoDocumentoId.trim();
       if (input.nombrePlantilla !== undefined) updateData.nombrePlantilla = input.nombrePlantilla.trim();
       if (input.plantillaUrl !== undefined) updateData.plantillaUrl = input.plantillaUrl.trim();
       if (input.formatosPermitidos !== undefined) updateData.formatosPermitidos = input.formatosPermitidos?.trim() || null;
@@ -87,88 +84,34 @@ export class PlantillaDocumentoMongoRepository extends BaseMongoRepository<Plant
 
   async listarPlantillasDocumento(filtros?: PlantillaDocumentoFiltros, limit = 20, offset = 0): Promise<PlantillaDocumentoConnection> {
     try {
-      const matchStage: any = {};
-
-      // Aplicar filtros
-      if (filtros) {
-        // Filtro por tipo documento (ID o nombre)
-        if (filtros.tipoDocumentoId) {
-          matchStage.tipoDocumentoId = filtros.tipoDocumentoId;
-        }
-        
-        // Filtro por nombre de plantilla
-        if (filtros.nombrePlantilla) {
-          matchStage.nombrePlantilla = { $regex: filtros.nombrePlantilla, $options: 'i' };
-        }
-        
-        // Filtro por código de plantilla
-        if (filtros.codigo) {
-          matchStage.codigo = { $regex: filtros.codigo, $options: 'i' };
-        }
-        
-        // Filtro por estado activo
-        if (filtros.activo !== undefined) {
-          matchStage.activo = filtros.activo;
-        }
-
-        // Filtro por búsqueda general (busca en código, nombre de plantilla y tipo documento)
-        if (filtros.busqueda) {
-          matchStage.$or = [
+      const conditions: any[] = [];
+      if (filtros?.activo !== undefined) {
+        conditions.push({ activo: filtros.activo });
+      }
+      if (filtros?.codigo) {
+        conditions.push({ codigo: { $regex: filtros.codigo, $options: 'i' } });
+      }
+      if (filtros?.nombrePlantilla) {
+        conditions.push({ nombrePlantilla: { $regex: filtros.nombrePlantilla, $options: 'i' } });
+      }
+      if (filtros?.busqueda) {
+        conditions.push({
+          $or: [
             { codigo: { $regex: filtros.busqueda, $options: 'i' } },
             { nombrePlantilla: { $regex: filtros.busqueda, $options: 'i' } }
-          ];
-        }
+          ]
+        });
       }
+      const matchStage =
+        conditions.length === 0
+          ? {}
+          : conditions.length === 1
+            ? conditions[0]
+            : { $and: conditions };
 
-      // Pipeline de agregación con lookup a TipoDocumento
       const pipeline: any[] = [
         { $match: matchStage },
-        {
-          $lookup: {
-            from: 'tipodocumentos', // Mongoose: 'TipoDocumento' -> 'tipodocumentos'
-            let: { tipoDocumentoId: '$tipoDocumentoId' },
-            pipeline: [
-              {
-                $match: {
-                  $expr: {
-                    $eq: ['$_id', { $toObjectId: '$$tipoDocumentoId' }]
-                  }
-                }
-              }
-            ],
-            as: 'tipoDocumento'
-          }
-        },
-        {
-          $unwind: {
-            path: '$tipoDocumento',
-            preserveNullAndEmptyArrays: true // Mantener documentos sin tipo documento
-          }
-        },
-        // Búsqueda adicional en tipo documento si hay búsqueda general
-        ...(filtros?.busqueda ? [{
-          $match: {
-            $or: [
-              { codigo: { $regex: filtros.busqueda, $options: 'i' } },
-              { nombrePlantilla: { $regex: filtros.busqueda, $options: 'i' } },
-              { 'tipoDocumento.codigo': { $regex: filtros.busqueda, $options: 'i' } },
-              { 'tipoDocumento.nombre': { $regex: filtros.busqueda, $options: 'i' } },
-              { 'tipoDocumento.descripcion': { $regex: filtros.busqueda, $options: 'i' } }
-            ]
-          }
-        }] : []),
-        // Búsqueda específica por tipo documento (código o nombre)
-        ...(filtros?.tipoDocumento ? [{
-          $match: {
-            $or: [
-              { 'tipoDocumento.codigo': { $regex: filtros.tipoDocumento, $options: 'i' } },
-              { 'tipoDocumento.nombre': { $regex: filtros.tipoDocumento, $options: 'i' } }
-            ]
-          }
-        }] : []),
-        {
-          $sort: { fechaCreacion: -1 }
-        },
+        { $sort: { fechaCreacion: -1 } },
         {
           $facet: {
             data: [
@@ -187,18 +130,7 @@ export class PlantillaDocumentoMongoRepository extends BaseMongoRepository<Plant
       const plantillasDocumento = result[0]?.data || [];
       const totalCount = result[0]?.totalCount?.[0]?.count || 0;
 
-      // Mapear resultados al dominio
-      const plantillasMapeadas = plantillasDocumento.map((doc: any) => {
-        const plantilla = this.toDomain(doc);
-        // Agregar información del tipo documento si existe
-        if (doc.tipoDocumento) {
-          return {
-            ...plantilla,
-            tipoDocumento: doc.tipoDocumento
-          };
-        }
-        return plantilla;
-      });
+      const plantillasMapeadas = plantillasDocumento.map((doc: any) => this.toDomain(doc));
 
       return {
         plantillasDocumento: plantillasMapeadas,
@@ -234,36 +166,9 @@ export class PlantillaDocumentoMongoRepository extends BaseMongoRepository<Plant
     }
   }
 
-  async obtenerPlantillasPorTipoDocumento(tipoDocumentoId: string): Promise<PlantillaDocumento[]> {
-    try {
-      const docs = await PlantillaDocumentoModel.find({ tipoDocumentoId })
-        .sort({ nombrePlantilla: 1 });
-
-      return docs.map(doc => this.toDomain(doc.toObject()));
-    } catch (error) {
-      console.error('Error al obtener plantillas por tipo de documento:', error);
-      throw error;
-    }
-  }
-
-  async obtenerPlantillaActivaPorTipoDocumento(tipoDocumentoId: string): Promise<PlantillaDocumento | null> {
-    try {
-      const doc = await PlantillaDocumentoModel.findOne({ 
-        tipoDocumentoId, 
-        activo: true 
-      });
-      
-      return doc ? this.toDomain(doc.toObject()) : null;
-    } catch (error) {
-      console.error('Error al obtener plantilla activa por tipo de documento:', error);
-      throw error;
-    }
-  }
-
-  async existeNombrePlantilla(tipoDocumentoId: string, nombrePlantilla: string, excludeId?: string): Promise<boolean> {
+  async existeNombrePlantilla(nombrePlantilla: string, excludeId?: string): Promise<boolean> {
     try {
       const query: any = { 
-        tipoDocumentoId: tipoDocumentoId.trim(),
         nombrePlantilla: nombrePlantilla.trim() 
       };
       if (excludeId) {
@@ -274,24 +179,6 @@ export class PlantillaDocumentoMongoRepository extends BaseMongoRepository<Plant
       return count > 0;
     } catch (error) {
       console.error('Error al verificar existencia de nombre de plantilla:', error);
-      throw error;
-    }
-  }
-
-  async existePlantillaActiva(tipoDocumentoId: string, excludeId?: string): Promise<boolean> {
-    try {
-      const query: any = { 
-        tipoDocumentoId: tipoDocumentoId.trim(),
-        activo: true 
-      };
-      if (excludeId) {
-        query._id = { $ne: excludeId };
-      }
-
-      const count = await PlantillaDocumentoModel.countDocuments(query);
-      return count > 0;
-    } catch (error) {
-      console.error('Error al verificar existencia de plantilla activa:', error);
       throw error;
     }
   }

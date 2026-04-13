@@ -7,7 +7,6 @@ import { AuthResolver } from './AuthResolver';
 import { AuthAdminResolver } from './AuthAdminResolver';
 import { AuthProveedorResolver } from './AuthProveedorResolver';
 import { UsuarioProveedorResolver } from './UsuarioProveedorResolver';
-import { TipoDocumentoResolver } from './TipoDocumentoResolver';
 import { CategoriaChecklistResolver } from './CategoriaChecklistResolver';
 import { PlantillaDocumentoResolver } from './PlantillaDocumentoResolver';
 import { PlantillaChecklistResolver } from './PlantillaChecklistResolver';
@@ -28,7 +27,6 @@ import { AuthService } from '../../../aplicacion/servicios/AuthService';
 import { AuthAdminService } from '../../../aplicacion/servicios/AuthAdminService';
 import { AuthProveedorService } from '../../../aplicacion/servicios/AuthProveedorService';
 import { UsuarioProveedorService } from '../../../aplicacion/servicios/UsuarioProveedorService';
-import { TipoDocumentoService } from '../../../aplicacion/servicios/TipoDocumentoService';
 import { CategoriaChecklistService } from '../../../dominio/servicios/CategoriaChecklistService';
 import { PlantillaDocumentoService } from '../../../dominio/servicios/PlantillaDocumentoService';
 import { PlantillaChecklistService } from '../../../dominio/servicios/PlantillaChecklistService';
@@ -47,7 +45,6 @@ import { ReporteSolicitudPagoService } from '../../../dominio/servicios/ReporteS
 import { DocumentoSubidoService } from '../../../dominio/servicios/DocumentoSubidoService';
 import { ChecklistProveedorBatchService } from '../../../dominio/servicios/ChecklistProveedorBatchService';
 import { UsuarioProveedorMongoRepository } from '../../persistencia/mongo/UsuarioProveedorMongoRepository';
-import { TipoDocumentoMongoRepository } from '../../persistencia/mongo/TipoDocumentoMongoRepository';
 import { CategoriaChecklistMongoRepository } from '../../persistencia/mongo/CategoriaChecklistMongoRepository';
 import { PlantillaDocumentoMongoRepository } from '../../persistencia/mongo/PlantillaDocumentoMongoRepository';
 import { PlantillaChecklistMongoRepository } from '../../persistencia/mongo/PlantillaChecklistMongoRepository';
@@ -96,9 +93,6 @@ export class ResolverFactory {
     
     // Registrar UsuarioProveedorMongoRepository (usuarios locales)
     container.register('UsuarioProveedorMongoRepository', () => new UsuarioProveedorMongoRepository(), true);
-    
-    // Registrar TipoDocumentoMongoRepository
-    container.register('TipoDocumentoMongoRepository', () => new TipoDocumentoMongoRepository(), true);
     
     // Registrar CategoriaChecklistMongoRepository
     container.register('CategoriaChecklistMongoRepository', () => new CategoriaChecklistMongoRepository(), true);
@@ -183,12 +177,6 @@ export class ResolverFactory {
       return new AuthProveedorService(usuarioProveedorService);
     }, true);
     
-    // Registrar TipoDocumentoService (usa TipoDocumentoMongoRepository)
-    container.register('TipoDocumentoService', (c: any) => {
-      const tipoDocumentoRepo = c.resolve('TipoDocumentoMongoRepository');
-      return new TipoDocumentoService(tipoDocumentoRepo);
-    }, true);
-    
     // Registrar CategoriaChecklistService (usa CategoriaChecklistMongoRepository)
     container.register('CategoriaChecklistService', (c: any) => {
       const categoriaChecklistRepo = c.resolve('CategoriaChecklistMongoRepository');
@@ -238,12 +226,6 @@ export class ResolverFactory {
     container.register('UsuarioProveedorResolver', (c: any) => {
       const usuarioProveedorService = c.resolve('UsuarioProveedorService');
       return new UsuarioProveedorResolver(usuarioProveedorService);
-    }, true);
-    
-    // Registrar TipoDocumentoResolver
-    container.register('TipoDocumentoResolver', (c: any) => {
-      const tipoDocumentoService = c.resolve('TipoDocumentoService');
-      return new TipoDocumentoResolver(tipoDocumentoService);
     }, true);
     
     // Registrar CategoriaChecklistResolver
@@ -298,8 +280,11 @@ export class ResolverFactory {
     
     // Registrar ExpedientePagoResolver
     container.register('ExpedientePagoResolver', (c: any) => {
-      const expedientePagoService = c.resolve('ExpedientePagoService');
-      return new ExpedientePagoResolver(expedientePagoService);
+      return new ExpedientePagoResolver(
+        c.resolve('ExpedientePagoService'),
+        c.resolve('SolicitudPagoMongoRepository'),
+        c.resolve('AprobacionChecklistRevisionService')
+      );
     }, true);
     
     // Registrar TipoPagoOCResolver
@@ -455,11 +440,6 @@ export class ResolverFactory {
       const usuarioProveedorResolver = container.resolve<UsuarioProveedorResolver>('UsuarioProveedorResolver');
       resolvers.push(usuarioProveedorResolver.getResolvers());
       logger.debug('Resolver configurado: usuarioProveedor');
-      
-      // Crear TipoDocumentoResolver
-      const tipoDocumentoResolver = container.resolve<TipoDocumentoResolver>('TipoDocumentoResolver');
-      resolvers.push(tipoDocumentoResolver.getResolvers());
-      logger.debug('Resolver configurado: tipoDocumento');
       
       // Crear CategoriaChecklistResolver
       const categoriaChecklistResolver = container.resolve<CategoriaChecklistResolver>('CategoriaChecklistResolver');

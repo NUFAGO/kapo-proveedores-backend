@@ -52,13 +52,10 @@ export interface RequisitoDocumento {
   activo: boolean
   plantillaDocumento?: {
     id: string
+    codigo: string
     nombrePlantilla: string
     plantillaUrl: string
     activo: boolean
-    tipoDocumento: {
-      id: string
-      nombre: string
-    }
   }
   formulario?: {
     id: string

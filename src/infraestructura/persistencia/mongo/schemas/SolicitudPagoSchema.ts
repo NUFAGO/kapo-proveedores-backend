@@ -7,6 +7,7 @@ export interface ISolicitudPago extends Document {
   montoSolicitado: number;
   estado: 'BORRADOR' | 'EN_REVISION' | 'OBSERVADA' | 'RECHAZADA' | 'APROBADO';
   fechaCreacion: Date;
+  ordenPagoVinculadoId?: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -38,6 +39,12 @@ const SolicitudPagoSchema = new Schema<ISolicitudPago>({
     type: Date,
     required: true,
     default: Date.now
+  },
+  ordenPagoVinculadoId: {
+    type: String,
+    required: false,
+    default: null,
+    trim: true
   }
 }, {
   timestamps: true,
@@ -50,6 +57,10 @@ SolicitudPagoSchema.index({ tipoPagoOCId: 1 });
 SolicitudPagoSchema.index({ estado: 1 });
 SolicitudPagoSchema.index({ fechaCreacion: -1 });
 SolicitudPagoSchema.index({ expedienteId: 1, estado: 1 });
+SolicitudPagoSchema.index(
+  { ordenPagoVinculadoId: 1 },
+  { sparse: true }
+);
 
 // Middleware para validaciones
 SolicitudPagoSchema.pre('save', function(next) {

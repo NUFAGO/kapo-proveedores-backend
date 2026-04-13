@@ -7,7 +7,7 @@ import { logger } from '../logging';
 
 export interface GraphQLContext {
   req?: {
-    headers?: {
+    headers?: Record<string, string | string[] | undefined> & {
       authorization?: string;
     };
   };

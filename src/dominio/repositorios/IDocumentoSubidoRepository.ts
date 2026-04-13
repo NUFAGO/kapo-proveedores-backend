@@ -17,6 +17,7 @@ export interface IDocumentoSubidoRepository {
   // Consultas específicas
   findByDocumentoOC(documentoOCId: string): Promise<DocumentoSubido[]>;
   findBySolicitudPago(solicitudPagoId: string): Promise<DocumentoSubido[]>;
+  findBySolicitudPagoIds(solicitudPagoIds: string[]): Promise<DocumentoSubido[]>;
   findByUsuario(usuarioId: string): Promise<DocumentoSubido[]>;
   
   // Listados con filtros

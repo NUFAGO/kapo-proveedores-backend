@@ -291,7 +291,6 @@ export class ExpedientePagoService {
     //   if (requisito.tipoRequisito === 'documento') {
     //     const documentoInput = {
     //       expedienteId,
-    //       tipoDocumentoId: requisito.plantillaDocumentoId || requisito.tipoDocumentoId,
     //       plantillaDocumentoId: requisito.plantillaDocumentoId,
     //       obligatorio: requisito.obligatorio
     //     };

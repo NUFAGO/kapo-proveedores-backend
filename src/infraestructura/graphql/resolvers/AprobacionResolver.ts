@@ -98,14 +98,12 @@ function mapChecklistRevisionGQL(plantilla: PlantillaChecklist) {
           ? {
               id: pd.id,
               codigo: (pd as { codigo?: string }).codigo ?? '',
-              tipoDocumentoId: (pd as { tipoDocumentoId?: string }).tipoDocumentoId ?? '',
               nombrePlantilla: pd.nombrePlantilla,
               plantillaUrl: pd.plantillaUrl,
               formatosPermitidos: (pd as { formatosPermitidos?: string }).formatosPermitidos ?? null,
               activo: pd.activo,
               fechaCreacion: (pd as { fechaCreacion?: string }).fechaCreacion ?? new Date().toISOString(),
               fechaActualizacion: (pd as { fechaActualizacion?: string }).fechaActualizacion ?? null,
-              tipoDocumento: null,
             }
           : null,
         formulario: r.formulario
@@ -147,7 +145,7 @@ function mapChecklistRevisionGQL(plantilla: PlantillaChecklist) {
   };
 }
 
-function mapDetalleChecklistRevisionGQL(detalle: AprobacionChecklistRevisionDetalle) {
+export function mapDetalleChecklistRevisionGQL(detalle: AprobacionChecklistRevisionDetalle) {
   const base: Record<string, unknown> = {
     aprobacionId: detalle.aprobacionId,
     estado: detalle.estado,

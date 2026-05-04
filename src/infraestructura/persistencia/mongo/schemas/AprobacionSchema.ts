@@ -23,6 +23,10 @@ export interface IAprobacionDocument extends Document {
   entidadTipo: 'solicitud_pago' | 'documento_oc';
   entidadId: string;
   expedienteId: string;
+  expedienteCodigo?: string;
+  proveedorId?: string;
+  proveedorNombre?: string;
+  expedienteDescripcion?: string;
   montoSolicitado?: number;
   tipoPagoOCId?: string;
   estado: 'EN_REVISION' | 'OBSERVADO' | 'APROBADO' | 'RECHAZADO';
@@ -66,6 +70,10 @@ const AprobacionMongoSchema = new Schema<IAprobacionDocument>(
     },
     entidadId: { type: String, required: true, index: true },
     expedienteId: { type: String, required: true, index: true },
+    expedienteCodigo: { type: String, index: true },
+    proveedorId: { type: String, index: true },
+    proveedorNombre: { type: String },
+    expedienteDescripcion: { type: String },
     montoSolicitado: { type: Number, min: 0 },
     tipoPagoOCId: { type: String, index: true },
     estado: {

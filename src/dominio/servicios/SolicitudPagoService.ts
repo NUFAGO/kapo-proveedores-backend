@@ -109,6 +109,22 @@ export class SolicitudPagoService {
   }
 
   /**
+   * Solicitud cuyo `ordenPagoVinculadoId` coincide con el id de OP en Inacons (la más reciente si hubiera duplicados).
+   */
+  async obtenerSolicitudPorOrdenPagoVinculadoId(ordenPagoVinculadoId: string): Promise<SolicitudPago> {
+    const trimmed = String(ordenPagoVinculadoId ?? '').trim();
+    if (!trimmed) {
+      throw new Error('ordenPagoVinculadoId es obligatorio');
+    }
+    const list = await this.solicitudPagoRepository.listWithFilters({ ordenPagoVinculadoId: trimmed });
+    const first = list[0];
+    if (!first) {
+      throw new Error('No se encontró solicitud vinculada a esa orden de pago');
+    }
+    return first;
+  }
+
+  /**
    * Listar solicitudes de pago con filtros
    */
   async listarSolicitudesPago(filter: SolicitudPagoFilter): Promise<SolicitudPago[]> {
@@ -242,6 +258,59 @@ export class SolicitudPagoService {
     }
 
     return solicitudActualizada;
+  }
+
+  /**
+   * Vincula una solicitud aprobada con el id de orden de pago en Inacons.
+   * Valida expediente.ocId frente a ordenCompraInaconsId y evita doble uso de la misma OP.
+   */
+  async vincularConOrdenPagoInacons(
+    solicitudPagoId: string,
+    ordenPagoInaconsId: string,
+    ordenCompraInaconsId: string
+  ): Promise<SolicitudPago> {
+    const opId = ordenPagoInaconsId.trim();
+    const ocId = ordenCompraInaconsId.trim();
+    if (!opId || !ocId) {
+      throw new Error('ordenPagoInaconsId y ordenCompraInaconsId son obligatorios');
+    }
+
+    const solicitud = await this.obtenerSolicitudPago(solicitudPagoId);
+    if (solicitud.estado !== 'APROBADO') {
+      throw new Error('Solo se pueden vincular solicitudes en estado APROBADO');
+    }
+
+    const expediente = await this.expedientePagoRepository.findById(solicitud.expedienteId);
+    if (!expediente) {
+      throw new Error('Expediente de la solicitud no encontrado');
+    }
+    if (String(expediente.ocId).trim() !== ocId) {
+      throw new Error('La orden de compra no coincide con el expediente de la solicitud');
+    }
+
+    const actual = solicitud.ordenPagoVinculadoId?.trim();
+    if (actual && actual !== opId) {
+      throw new Error('La solicitud ya tiene otra orden de pago vinculada');
+    }
+    if (actual === opId) {
+      return solicitud;
+    }
+
+    const conMismaOp = await this.solicitudPagoRepository.listWithFilters({
+      ordenPagoVinculadoId: opId,
+    });
+    const conflicto = conMismaOp.find((s) => s.id !== solicitudPagoId);
+    if (conflicto) {
+      throw new Error('La orden de pago ya está vinculada a otra solicitud de pago');
+    }
+
+    const actualizada = await this.solicitudPagoRepository.update(solicitudPagoId, {
+      ordenPagoVinculadoId: opId,
+    });
+    if (!actualizada) {
+      throw new Error('No se pudo actualizar la solicitud de pago');
+    }
+    return actualizada;
   }
 
   /**

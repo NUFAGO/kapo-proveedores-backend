@@ -22,6 +22,7 @@ import { AprobacionResolver } from './AprobacionResolver';
 import { ChecklistProveedorResolver } from './ChecklistProveedorResolver';
 import { SolicitudPagoResolver } from './SolicitudPagoResolver';
 import { ReporteSolicitudPagoResolver } from './ReporteSolicitudPagoResolver';
+import { DashboardResolver } from './DashboardResolver';
 import { Container } from '../../di/Container';
 import { AuthService } from '../../../aplicacion/servicios/AuthService';
 import { AuthAdminService } from '../../../aplicacion/servicios/AuthAdminService';
@@ -42,6 +43,7 @@ import { AprobacionChecklistRevisionService } from '../../../dominio/servicios/A
 import { AprobacionFinalizarRevisionChecklistService } from '../../../dominio/servicios/AprobacionFinalizarRevisionChecklistService';
 import { SolicitudPagoService } from '../../../dominio/servicios/SolicitudPagoService';
 import { ReporteSolicitudPagoService } from '../../../dominio/servicios/ReporteSolicitudPagoService';
+import { DashboardService } from '../../../aplicacion/servicios/DashboardService';
 import { DocumentoSubidoService } from '../../../dominio/servicios/DocumentoSubidoService';
 import { ChecklistProveedorBatchService } from '../../../dominio/servicios/ChecklistProveedorBatchService';
 import { UsuarioProveedorMongoRepository } from '../../persistencia/mongo/UsuarioProveedorMongoRepository';
@@ -315,7 +317,8 @@ export class ResolverFactory {
 
     container.register('AprobacionService', (c: any) => {
       const repo = c.resolve('AprobacionMongoRepository');
-      return new AprobacionService(repo);
+      const expedienteRepo = c.resolve('ExpedientePagoMongoRepository');
+      return new AprobacionService(repo, expedienteRepo);
     }, true);
 
     container.register('DocumentoSubidoMongoRepository', () => new DocumentoSubidoMongoRepository(), true);
@@ -333,7 +336,8 @@ export class ResolverFactory {
       return new SolicitudPagoResolver(
         c.resolve('TipoPagoOCMongoRepository'),
         c.resolve('ExpedientePagoMongoRepository'),
-        c.resolve('ExpedientePagoService')
+        c.resolve('ExpedientePagoService'),
+        c.resolve('AprobacionChecklistRevisionService')
       );
     }, true);
 
@@ -408,8 +412,17 @@ export class ResolverFactory {
     container.register('ChecklistProveedorResolver', (c: any) => {
       return new ChecklistProveedorResolver(c.resolve('ChecklistProveedorBatchService'));
     }, true);
-    
-    logger.info('Container inicializado con dependencias de autenticación, usuarios proveedor, tipos de documento, categorias checklist, plantillas de documento, upload, ordenes de compra, expedientes pago, tipos pago OC, documentos OC, documentos subidos, reportes solicitud pago, proveedores, aprobaciones, checklist proveedor batch y sus repositories MongoDB');
+
+    // Registrar DashboardService (no requiere repos: usa modelos Mongoose directamente)
+    container.register('DashboardService', () => new DashboardService(), true);
+
+    // Registrar DashboardResolver
+    container.register('DashboardResolver', (c: any) => {
+      const dashboardService = c.resolve('DashboardService');
+      return new DashboardResolver(dashboardService);
+    }, true);
+
+    logger.info('Container inicializado con dependencias de autenticación, usuarios proveedor, tipos de documento, categorias checklist, plantillas de documento, upload, ordenes de compra, expedientes pago, tipos pago OC, documentos OC, documentos subidos, reportes solicitud pago, proveedores, aprobaciones, checklist proveedor batch, dashboard y sus repositories MongoDB');
   }
 
   /**
@@ -510,7 +523,12 @@ export class ResolverFactory {
       const reporteSolicitudPagoResolver = container.resolve<ReporteSolicitudPagoResolver>('ReporteSolicitudPagoResolver');
       resolvers.push(reporteSolicitudPagoResolver.getResolvers());
       logger.debug('Resolver configurado: reporteSolicitudPago');
-      
+
+      // Crear DashboardResolver
+      const dashboardResolver = container.resolve<DashboardResolver>('DashboardResolver');
+      resolvers.push(dashboardResolver.getResolvers());
+      logger.debug('Resolver configurado: dashboard');
+
       // TODO: Activar guardias dinámicas después de resolver el problema
       // const resolversConGuardias = DynamicGuardSystem.processResolvers(resolvers);
       

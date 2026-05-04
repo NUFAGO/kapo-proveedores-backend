@@ -8,6 +8,7 @@ import { IPlantillaChecklistRepository } from '../repositorios/IPlantillaCheckli
 import { ISolicitudPagoRepository } from '../repositorios/ISolicitudPagoRepository';
 import { BaseHttpRepository } from '../../infraestructura/persistencia/http/BaseHttpRepository';
 import { logger } from '../../infraestructura/logging';
+import { redondearMontoSoles } from '../util/redondearMontoSoles';
 
 function porcentajeTipoPagoOmitido(value: number | null | undefined): number | undefined {
   if (value == null || !Number.isFinite(value) || value <= 0) {
@@ -100,12 +101,20 @@ export class ExpedientePagoService {
       throw new Error('Ya existe un expediente para esta orden de compra');
     }
 
-    // Calcular montos iniciales
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const montoDisponible = input.montoContrato;
+    const montoContrato = redondearMontoSoles(input.montoContrato);
+    const montoDisponible = montoContrato;
+    const ocSnapshot =
+      input.ocSnapshot &&
+      typeof input.ocSnapshot === 'object' &&
+      !Array.isArray(input.ocSnapshot) &&
+      'montoContrato' in input.ocSnapshot
+        ? { ...input.ocSnapshot, montoContrato }
+        : input.ocSnapshot;
 
     const expediente: Omit<ExpedientePago, 'id'> = {
       ...input,
+      montoContrato,
+      ocSnapshot,
       fechaSnapshot: new Date(),
       estado: 'en_configuracion',
       montoComprometido: 0,
@@ -420,14 +429,17 @@ export class ExpedientePagoService {
       bloqueaSolicitudPago?: boolean | null;
     }>
   ): Promise<ExpedientePago> {
+    const montoContrato = redondearMontoSoles(ocData.montoContrato);
+    const ocDataSnapshot = { ...ocData, montoContrato };
+
     // 2. Crear el expediente con los datos proporcionados
     const expedienteInput: ExpedientePagoInput = {
       ocId: ocData.id,
       ocCodigo: ocData.codigo,
-      ocSnapshot: ocData, // Guardamos los datos que recibimos
+      ocSnapshot: ocDataSnapshot,
       proveedorId: ocData.proveedorId,
       proveedorNombre: ocData.proveedorNombre,
-      montoContrato: ocData.montoContrato,
+      montoContrato,
       fechaInicioContrato: new Date(ocData.fechaInicioContrato),
       fechaFinContrato: new Date(ocData.fechaFinContrato),
       descripcion: ocData.descripcion || `Expediente para OC ${ocData.codigo}`,
@@ -926,16 +938,17 @@ export class ExpedientePagoService {
   }
 
   /**
-   * Cierra el expediente a `completado` cuando el cupo está agotado y no quedan documentos OC pendientes.
+   * Cierra el expediente a `completado` cuando el cupo está agotado y, si hay documentos OC,
+   * todos están `APROBADO`.
    *
    * - **Solicitud de pago** (tras comprometer saldo): pasar `snapshotPostUpdate` con el
    *   `montoDisponible` ya persistido y el `estado` previo del expediente.
    * - **Documento OC**: no modifica saldos; sin snapshot se lee el expediente en BD (solo consulta
-   *   de `montoDisponible`). Tras `aprobarDocumentoOC`, todos los DocumentoOC del expediente deben
-   *   estar `APROBADO` para poder cerrar.
+   *   de `montoDisponible`). Si el expediente tiene DocumentoOC, todos deben estar `APROBADO` para cerrar.
+   * - **Sin documentos OC**: si no hay ninguno asociado, no bloquea el cierre; basta con cupo ~0.
    *
-   * Condiciones: `montoDisponible` en ~0 (tolerancia 0.02), al menos un DocumentoOC en el expediente,
-   * todos ellos `APROBADO`, y estado del expediente no en `sinAutocierre`.
+   * Condiciones: `montoDisponible` en ~0 (tolerancia 0.02), estado del expediente no en `sinAutocierre`,
+   * y si existen DocumentoOC, todos `APROBADO`.
    *
    * @param snapshotPostUpdate Opcional: evita un findById cuando el llamador acaba de persistir saldos.
    * @param session Sesión Mongo opcional; si se pasa, lecturas y el posible `update` a `completado` usan la misma transacción.
@@ -972,8 +985,7 @@ export class ExpedientePagoService {
     if (montoDisponible < -eps) return;
 
     const docs = await this.documentoOCRepository.findByExpedienteId(expedienteId, session);
-    if (docs.length === 0) return;
-    if (docs.some((d) => d.estado !== 'APROBADO')) return;
+    if (docs.length > 0 && docs.some((d) => d.estado !== 'APROBADO')) return;
 
     const expedienteCerrado = await this.expedienteRepository.update(
       expedienteId,
@@ -982,11 +994,13 @@ export class ExpedientePagoService {
     );
     if (!expedienteCerrado) {
       throw new Error(
-        'No se pudo marcar el expediente como completado (cupo agotado y todos los documentos OC aprobados). La operación se revirtió.'
+        'No se pudo marcar el expediente como completado (cupo agotado y documentos OC en regla si aplica). La operación se revirtió.'
       );
     }
     logger.info(
-      '[ExpedientePago] Expediente marcado completado: cupo agotado y todos los Documento OC aprobados',
+      docs.length > 0
+        ? '[ExpedientePago] Expediente marcado completado: cupo agotado y todos los Documento OC aprobados'
+        : '[ExpedientePago] Expediente marcado completado: cupo agotado sin documentos OC en el expediente',
       { expedienteId }
     );
   }

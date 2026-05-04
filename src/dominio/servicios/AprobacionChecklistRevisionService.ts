@@ -89,6 +89,44 @@ export class AprobacionChecklistRevisionService {
   }
 
   /**
+   * Igual que `obtenerDetallePorAprobacionId`, pero exige que el tipo de pago efectivo
+   * coincida con `tipoPagoOCId` (solo aplica a `solicitud_pago`).
+   */
+  async obtenerDetallePorAprobacionIdYtipoPagoOCId(
+    aprobacionId: string,
+    tipoPagoOCId: string
+  ): Promise<AprobacionChecklistRevisionDetalle> {
+    const detalle = await this.obtenerDetallePorAprobacionId(aprobacionId);
+    if (detalle.entidadTipo !== 'solicitud_pago') {
+      throw new Error('tipoPagoOCId solo aplica cuando la aprobación es solicitud_pago');
+    }
+    const expected = String(tipoPagoOCId ?? '').trim();
+    const actual = String(detalle.tipoPagoOCId ?? '').trim();
+    if (!expected || actual !== expected) {
+      throw new Error('tipoPagoOCId no coincide con la solicitud vinculada a la aprobación');
+    }
+    return detalle;
+  }
+
+  /**
+   * Por id de orden de pago Inacons guardado en `SolicitudPago.ordenPagoVinculadoId`.
+   * Devuelve la solicitud y el mismo detalle de checklist/requisitos/documentos que el kanban (si existe `Aprobacion`).
+   */
+  async obtenerSolicitudPagoDetalleRevisionPorOrdenPagoVinculadoId(ordenPagoVinculadoId: string): Promise<{
+    solicitud: SolicitudPago;
+    revisionChecklist: AprobacionChecklistRevisionDetalle | null;
+  }> {
+    const solicitud = await this.solicitudPagoService.obtenerSolicitudPorOrdenPagoVinculadoId(
+      ordenPagoVinculadoId
+    );
+    const map = await this.construirDetallesRevisionPorSolicitudesPago([solicitud]);
+    return {
+      solicitud,
+      revisionChecklist: map.get(solicitud.id) ?? null,
+    };
+  }
+
+  /**
    * Misma forma que N × `obtenerDetallePorAprobacionId`, optimizado: pocas consultas Mongo (aprobaciones, tipos pago, checklists, documentos).
    */
   async construirDetallesRevisionPorSolicitudesPago(

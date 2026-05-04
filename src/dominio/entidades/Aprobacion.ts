@@ -29,6 +29,12 @@ export interface Aprobacion {
   entidadTipo: EntidadTipoAprobacion;
   entidadId: string;
   expedienteId: string;
+  /** Código OC del expediente (denormalizado para kanban / búsquedas). */
+  expedienteCodigo?: string;
+  proveedorId?: string;
+  proveedorNombre?: string;
+  /** Descripción del expediente al momento de crear la aprobación. */
+  expedienteDescripcion?: string;
   /** Monto solicitado en la solicitud de pago (solo aplica si entidadTipo es solicitud_pago). */
   montoSolicitado?: number;
   /** Tipo de pago OC asociado a la solicitud (denormalizado para kanban / listados). */
@@ -50,6 +56,13 @@ export interface CrearAprobacionInput {
   entidadTipo: EntidadTipoAprobacion;
   entidadId: string;
   expedienteId: string;
+  /**
+   * Denormalizados del expediente; si faltan, `AprobacionService` los completa con `findById(expedienteId)`.
+   */
+  expedienteCodigo?: string;
+  proveedorId?: string;
+  proveedorNombre?: string;
+  expedienteDescripcion?: string;
   /** Obligatorio si entidadTipo es solicitud_pago. */
   montoSolicitado?: number;
   /** Opcional pero recomendado para solicitud_pago (TipoPagoOC de la solicitud). */
@@ -62,6 +75,15 @@ export interface AprobacionFiltros {
   estado?: EstadoAprobacion;
   expedienteId?: string;
   entidadTipo?: EntidadTipoAprobacion;
+  /**
+   * Búsqueda unificada: coincide por texto parcial (regex escapado en varios campos)
+   * o por id exacto (`_id` de la aprobación si es ObjectId válido, o `expedienteId` / `proveedorId` / `entidadId`).
+   */
+  busqueda?: string;
+  entidadId?: string;
+  proveedorId?: string;
+  tipoPagoOCId?: string;
+  solicitanteId?: string;
   page?: number;
   limit?: number;
   /** Si está definido, se usa como skip en lugar de (page - 1) * limit (scroll por columna). */

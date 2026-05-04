@@ -1,3 +1,4 @@
+import mongoose from 'mongoose';
 import { IAprobacionRepository, SetRevisorFields } from '../../../dominio/repositorios/IAprobacionRepository';
 import {
   Aprobacion,
@@ -9,6 +10,60 @@ import {
   RevisionRequisitoComentario,
 } from '../../../dominio/entidades/Aprobacion';
 import { AprobacionModel } from './schemas/AprobacionSchema';
+
+function escapeRegex(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function isStrictObjectIdString(id: string): boolean {
+  return mongoose.Types.ObjectId.isValid(id) && String(new mongoose.Types.ObjectId(id)) === id;
+}
+
+/** Arma el filtro Mongo para listados / kanban (AND de igualdades + búsqueda OR en campos de texto). */
+export function buildAprobacionListarQuery(filtros: AprobacionFiltros): Record<string, unknown> {
+  const parts: Record<string, unknown>[] = [];
+
+  if (filtros.estado) parts.push({ estado: filtros.estado });
+  if (filtros.entidadTipo) parts.push({ entidadTipo: filtros.entidadTipo });
+  if (filtros.expedienteId) parts.push({ expedienteId: filtros.expedienteId });
+  if (filtros.entidadId) parts.push({ entidadId: filtros.entidadId });
+  if (filtros.proveedorId) parts.push({ proveedorId: filtros.proveedorId });
+  if (filtros.tipoPagoOCId) parts.push({ tipoPagoOCId: filtros.tipoPagoOCId });
+  if (filtros.solicitanteId) parts.push({ solicitanteId: filtros.solicitanteId });
+
+  const busqueda = filtros.busqueda?.trim();
+  if (busqueda && busqueda.length > 0) {
+    const pattern = escapeRegex(busqueda);
+    const re = { $regex: pattern, $options: 'i' };
+    const porTexto: Record<string, unknown> = {
+      $or: [
+        { expedienteCodigo: re },
+        { proveedorNombre: re },
+        { expedienteDescripcion: re },
+        { solicitanteNombre: re },
+        { revisorNombre: re },
+        { entidadId: re },
+        { expedienteId: re },
+        { proveedorId: re },
+        { tipoPagoOCId: re },
+      ],
+    };
+    const idConds: Record<string, unknown>[] = [
+      { expedienteId: busqueda },
+      { proveedorId: busqueda },
+      { entidadId: busqueda },
+    ];
+    if (isStrictObjectIdString(busqueda)) {
+      idConds.push({ _id: new mongoose.Types.ObjectId(busqueda) });
+    }
+    const porId: Record<string, unknown> = { $or: idConds };
+    parts.push({ $or: [porTexto, porId] });
+  }
+
+  if (parts.length === 0) return {};
+  if (parts.length === 1) return parts[0] as Record<string, unknown>;
+  return { $and: parts };
+}
 
 function mapRevision(raw: any): RevisionRequisitoComentario {
   return {
@@ -102,6 +157,30 @@ export class AprobacionMongoRepository implements IAprobacionRepository {
     if (doc.tipoPagoOCId !== undefined && doc.tipoPagoOCId !== null && doc.tipoPagoOCId !== '') {
       base.tipoPagoOCId = doc.tipoPagoOCId;
     }
+    if (
+      doc.expedienteCodigo !== undefined &&
+      doc.expedienteCodigo !== null &&
+      String(doc.expedienteCodigo) !== ''
+    ) {
+      base.expedienteCodigo = String(doc.expedienteCodigo);
+    }
+    if (doc.proveedorId !== undefined && doc.proveedorId !== null && String(doc.proveedorId) !== '') {
+      base.proveedorId = String(doc.proveedorId);
+    }
+    if (
+      doc.proveedorNombre !== undefined &&
+      doc.proveedorNombre !== null &&
+      String(doc.proveedorNombre) !== ''
+    ) {
+      base.proveedorNombre = String(doc.proveedorNombre);
+    }
+    if (
+      doc.expedienteDescripcion !== undefined &&
+      doc.expedienteDescripcion !== null &&
+      String(doc.expedienteDescripcion) !== ''
+    ) {
+      base.expedienteDescripcion = String(doc.expedienteDescripcion);
+    }
     return base;
   }
 
@@ -110,6 +189,10 @@ export class AprobacionMongoRepository implements IAprobacionRepository {
       entidadTipo: input.entidadTipo,
       entidadId: input.entidadId,
       expedienteId: input.expedienteId,
+      expedienteCodigo: input.expedienteCodigo ?? '',
+      proveedorId: input.proveedorId ?? '',
+      proveedorNombre: input.proveedorNombre ?? '',
+      expedienteDescripcion: input.expedienteDescripcion ?? '',
       ...(input.montoSolicitado !== undefined && input.montoSolicitado !== null
         ? { montoSolicitado: input.montoSolicitado }
         : {}),
@@ -158,11 +241,8 @@ export class AprobacionMongoRepository implements IAprobacionRepository {
   }
 
   async listar(filtros: AprobacionFiltros): Promise<AprobacionConnection> {
-    const { estado, expedienteId, entidadTipo, page = 1, limit = 20, offset: offsetInput } = filtros;
-    const query: Record<string, unknown> = {};
-    if (estado) query['estado'] = estado;
-    if (expedienteId) query['expedienteId'] = expedienteId;
-    if (entidadTipo) query['entidadTipo'] = entidadTipo;
+    const { page = 1, limit = 20, offset: offsetInput } = filtros;
+    const query = buildAprobacionListarQuery(filtros);
 
     const skip =
       offsetInput !== undefined && offsetInput !== null ? offsetInput : (page - 1) * limit;

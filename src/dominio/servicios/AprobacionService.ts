@@ -9,6 +9,7 @@ import {
   EntidadTipoAprobacion,
 } from '../entidades/Aprobacion';
 import { IAprobacionRepository } from '../repositorios/IAprobacionRepository';
+import type { IExpedientePagoRepository } from '../repositorios/IExpedientePagoRepository';
 
 export interface RevisorContext {
   revisorId: string;
@@ -16,7 +17,10 @@ export interface RevisorContext {
 }
 
 export class AprobacionService {
-  constructor(private readonly repo: IAprobacionRepository) {}
+  constructor(
+    private readonly repo: IAprobacionRepository,
+    private readonly expedienteRepo: IExpedientePagoRepository
+  ) {}
 
   private toItemComentario(input: AgregarComentarioInput): ItemComentarioAprobacion {
     const base: ItemComentarioAprobacion = {
@@ -65,7 +69,21 @@ export class AprobacionService {
         `Ya existe una aprobación para ${input.entidadTipo} con id ${input.entidadId}`
       );
     }
-    return this.repo.crear(input, session);
+
+    const expediente = await this.expedienteRepo.findById(input.expedienteId, session);
+    if (!expediente) {
+      throw new Error('Expediente no encontrado');
+    }
+
+    const enriquecido: CrearAprobacionInput = {
+      ...input,
+      expedienteCodigo: input.expedienteCodigo ?? expediente.ocCodigo ?? '',
+      proveedorId: input.proveedorId ?? expediente.proveedorId ?? '',
+      proveedorNombre: input.proveedorNombre ?? expediente.proveedorNombre ?? '',
+      expedienteDescripcion: input.expedienteDescripcion ?? expediente.descripcion ?? '',
+    };
+
+    return this.repo.crear(enriquecido, session);
   }
 
   async obtenerPorId(id: string): Promise<Aprobacion> {
@@ -103,6 +121,7 @@ export class AprobacionService {
     expedienteId?: string;
     entidadTipo?: EntidadTipoAprobacion;
     limit?: number;
+    busqueda?: string;
   }): Promise<
     Record<
       EstadoAprobacion,
@@ -117,6 +136,9 @@ export class AprobacionService {
         ? { expedienteId: filtros.expedienteId }
         : {}),
       ...(filtros?.entidadTipo !== undefined ? { entidadTipo: filtros.entidadTipo } : {}),
+      ...(filtros?.busqueda !== undefined && filtros.busqueda.trim() !== ''
+        ? { busqueda: filtros.busqueda.trim() }
+        : {}),
     };
 
     const results = await Promise.all(

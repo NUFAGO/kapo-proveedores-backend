@@ -37,6 +37,11 @@ type Aprobacion {
   entidadTipo: EntidadTipoAprobacion!
   entidadId: String!
   expedienteId: String!
+  """Código OC del expediente (denormalizado al crear la aprobación)."""
+  expedienteCodigo: String
+  proveedorId: String
+  proveedorNombre: String
+  expedienteDescripcion: String
   """Monto solicitado; aplica cuando la entidad es una solicitud de pago (TipoPagoOC)."""
   montoSolicitado: Float
   """Id del TipoPagoOC de la solicitud (denormalizado)."""
@@ -77,6 +82,15 @@ input AprobacionFiltros {
   estado: EstadoAprobacion
   expedienteId: String
   entidadTipo: EntidadTipoAprobacion
+  """
+  Búsqueda unificada: texto parcial en código OC, proveedor, descripción, etc.;
+  o coincidencia exacta con id de aprobación (ObjectId), expediente, proveedor o entidad vinculada.
+  """
+  busqueda: String
+  entidadId: String
+  proveedorId: String
+  tipoPagoOCId: String
+  solicitanteId: String
   page: Int = 1
   limit: Int = 20
   """Si se envía, sustituye el cálculo por página (skip = offset). Útil para scroll infinito por columna."""
@@ -100,6 +114,7 @@ type AprobacionesKanbanData {
 input AprobacionKanbanFiltros {
   expedienteId: String
   entidadTipo: EntidadTipoAprobacion
+  busqueda: String
   """Tamaño de página inicial por columna (por defecto 20)."""
   limit: Int = 20
 }
@@ -171,6 +186,10 @@ extend type Query {
   getKanbanDataAprobaciones(filtros: AprobacionKanbanFiltros): AprobacionesKanbanData!
   """Detalle de checklist y entregas al abrir una tarjeta del tablero (admin)."""
   detalleChecklistRevisionAprobacion(aprobacionId: ID!): AprobacionChecklistRevisionDetalle!
+  detalleChecklistRevisionAprobacionPorTipoPago(
+    aprobacionId: ID!
+    tipoPagoOCId: ID!
+  ): AprobacionChecklistRevisionDetalle!
   """
   Misma autorización que `aprobacionPorEntidad`: admin o proveedor dueño del expediente.
   """

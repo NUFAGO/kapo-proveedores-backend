@@ -1,0 +1,95 @@
+# Schema para metricas de Dashboards (admin interno + portal proveedor)
+# Cada query devuelve TODAS las metricas del dashboard en una sola llamada agregada.
+
+enum RangoDashboard {
+  ESTE_MES
+  MES_ANTERIOR
+  ULTIMOS_30D
+  ESTE_ANIO
+  TODO
+}
+
+input MetricasAdminFilter {
+  rango: RangoDashboard = ESTE_MES
+  proveedorId: String
+}
+
+input MetricasProveedorFilter {
+  rango: RangoDashboard = ESTE_MES
+}
+
+type PagoPorMes {
+  mes: String!
+  monto: Float!
+  cantidad: Int!
+}
+
+type SolicitudPorEstado {
+  estado: String!
+  cantidad: Int!
+}
+
+type TopObra {
+  obraId: String!
+  obraNombre: String!
+  montoTotal: Float!
+  ocCount: Int!
+}
+
+type IngresoPorMes {
+  mes: String!
+  monto: Float!
+}
+
+enum AccionPendienteTipo {
+  DOCUMENTO_FALTANTE
+  SOLICITUD_OBSERVADA
+  OC_POR_VENCER
+}
+
+enum AccionPendientePrioridad {
+  ALTA
+  MEDIA
+}
+
+type AccionPendiente {
+  tipo: AccionPendienteTipo!
+  ocCodigo: String!
+  mensaje: String!
+  urlAccion: String!
+  prioridad: AccionPendientePrioridad!
+}
+
+type MetricasAdmin {
+  "Expedientes con estado activo (configurado / en_ejecucion)."
+  ocActivasCount: Int!
+  "Expedientes en estado en_configuracion — pendientes de terminar de armar."
+  expedientesEnConfiguracionCount: Int!
+  "STOCK: suma de montoContrato de TODOS los expedientes activos (sin filtro fecha)."
+  montoComprometido: Float!
+  "STOCK: suma de montoPagado de TODOS los expedientes activos (sin filtro fecha). Coherente con montoComprometido."
+  montoPagado: Float!
+  "FLUJO: aprobaciones APROBADAS dentro del rango — lo aprobado en el período."
+  montoPagadoPeriodo: Float!
+  solicitudesPendientesCount: Int!
+  pagosPorMes: [PagoPorMes!]!
+  solicitudesPorEstado: [SolicitudPorEstado!]!
+  topObras: [TopObra!]!
+}
+
+type MetricasProveedor {
+  montoPorCobrar: Float!
+  montoCobrado: Float!
+  ocActivasCount: Int!
+  solicitudesEnRevisionCount: Int!
+  ingresosPorMes: [IngresoPorMes!]!
+  accionesPendientes: [AccionPendiente!]!
+}
+
+type Query {
+  obtenerMetricasAdmin(filter: MetricasAdminFilter): MetricasAdmin!
+  obtenerMetricasProveedor(
+    proveedorId: String!
+    filter: MetricasProveedorFilter
+  ): MetricasProveedor!
+}

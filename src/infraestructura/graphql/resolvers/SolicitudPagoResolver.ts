@@ -1,11 +1,13 @@
 import { SolicitudPagoService } from '../../../dominio/servicios/SolicitudPagoService';
 import { ExpedientePagoService } from '../../../dominio/servicios/ExpedientePagoService';
+import { AprobacionChecklistRevisionService } from '../../../dominio/servicios/AprobacionChecklistRevisionService';
 import { ISolicitudPagoRepository } from '../../../dominio/repositorios/ISolicitudPagoRepository';
 import { SolicitudPagoMongoRepository } from '../../persistencia/mongo/SolicitudPagoMongoRepository';
 import { ITipoPagoOCRepository } from '../../../dominio/repositorios/ITipoPagoOCRepository';
 import { IExpedientePagoRepository } from '../../../dominio/repositorios/IExpedientePagoRepository';
 import { SolicitudPagoFilter } from '../../../dominio/entidades/SolicitudPago';
 import { ErrorHandler } from './ErrorHandler';
+import { mapDetalleChecklistRevisionGQL } from './AprobacionResolver';
 import { adminGuard, authGuard, proveedorGuard, type GraphQLContext } from '../../auth/GraphQLGuards';
 import { JWTUtils } from '../../auth/JWTUtils';
 
@@ -44,13 +46,22 @@ interface RechazarSolicitudPagoArgs {
   input: { id: string; comentarios: string };
 }
 
+interface VincularSolicitudOrdenPagoInaconsArgs {
+  input: {
+    solicitudPagoId: string;
+    ordenPagoInaconsId: string;
+    ordenCompraInaconsId: string;
+  };
+}
+
 export class SolicitudPagoResolver {
   private servicio: SolicitudPagoService;
 
   constructor(
     private readonly tipoPagoOCRepository: ITipoPagoOCRepository,
     private readonly expedientePagoRepository: IExpedientePagoRepository,
-    expedientePagoService: ExpedientePagoService
+    expedientePagoService: ExpedientePagoService,
+    private readonly checklistRevision: AprobacionChecklistRevisionService
   ) {
     const solicitudPagoRepository: ISolicitudPagoRepository = new SolicitudPagoMongoRepository();
     this.servicio = new SolicitudPagoService(
@@ -136,6 +147,21 @@ export class SolicitudPagoResolver {
             'obtenerSolicitudesPorTipoPago'
           );
         }),
+
+        solicitudPagoDetalleByOrdenPagoId: async (_: unknown, { ordenPagoId }: { ordenPagoId: string }) => {
+          return await ErrorHandler.handleError(async () => {
+            const { solicitud, revisionChecklist } =
+              await this.checklistRevision.obtenerSolicitudPagoDetalleRevisionPorOrdenPagoVinculadoId(
+                ordenPagoId
+              );
+            return {
+              solicitud,
+              revisionChecklist: revisionChecklist
+                ? mapDetalleChecklistRevisionGQL(revisionChecklist)
+                : null,
+            };
+          }, 'solicitudPagoDetalleByOrdenPagoId');
+        },
       },
 
       Mutation: {
@@ -186,6 +212,20 @@ export class SolicitudPagoResolver {
             'eliminarSolicitudPago'
           );
         }),
+
+        // CUIDADO: Sin guard de autenticación — expuesto para llamadas backend-to-backend (inacons).
+        // Si se expone al frontend, agregar adminGuard.
+        vincularSolicitudConOrdenPagoInacons: async (_: any, { input }: VincularSolicitudOrdenPagoInaconsArgs) => {
+          return await ErrorHandler.handleError(
+            async () =>
+              await this.servicio.vincularConOrdenPagoInacons(
+                input.solicitudPagoId,
+                input.ordenPagoInaconsId,
+                input.ordenCompraInaconsId
+              ),
+            'vincularSolicitudConOrdenPagoInacons'
+          );
+        },
       }
     };
   }

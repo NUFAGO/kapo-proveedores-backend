@@ -170,6 +170,10 @@ function mapAprobacionGQL(a: Aprobacion) {
     entidadTipo: a.entidadTipo,
     entidadId: a.entidadId,
     expedienteId: a.expedienteId,
+    expedienteCodigo: a.expedienteCodigo ?? null,
+    proveedorId: a.proveedorId ?? null,
+    proveedorNombre: a.proveedorNombre ?? null,
+    expedienteDescripcion: a.expedienteDescripcion ?? null,
     montoSolicitado: a.montoSolicitado ?? null,
     tipoPagoOCId: a.tipoPagoOCId ?? null,
     estado: a.estado,
@@ -232,6 +236,13 @@ function isEstadoAprobacion(v: unknown): v is EstadoAprobacion {
   );
 }
 
+function trimString(raw: Record<string, unknown>, key: string): string | undefined {
+  const v = raw[key];
+  if (typeof v !== 'string') return undefined;
+  const t = v.trim();
+  return t === '' ? undefined : t;
+}
+
 /** Coerción segura desde el objeto `filtros` GraphQL (`Record`) hacia el dominio (exactOptionalPropertyTypes). */
 function toAprobacionFiltros(raw: Record<string, unknown> | undefined | null): AprobacionFiltros {
   if (raw == null) return {};
@@ -240,13 +251,26 @@ function toAprobacionFiltros(raw: Record<string, unknown> | undefined | null): A
   const estado = raw['estado'];
   if (isEstadoAprobacion(estado)) out.estado = estado;
 
-  const expedienteId = raw['expedienteId'];
-  if (typeof expedienteId === 'string' && expedienteId !== '') {
-    out.expedienteId = expedienteId;
-  }
+  const expedienteId = trimString(raw, 'expedienteId');
+  if (expedienteId !== undefined) out.expedienteId = expedienteId;
 
   const entidadTipo = raw['entidadTipo'];
   if (isEntidadTipoAprobacion(entidadTipo)) out.entidadTipo = entidadTipo;
+
+  const busqueda = trimString(raw, 'busqueda');
+  if (busqueda !== undefined) out.busqueda = busqueda;
+
+  const entidadId = trimString(raw, 'entidadId');
+  if (entidadId !== undefined) out.entidadId = entidadId;
+
+  const proveedorId = trimString(raw, 'proveedorId');
+  if (proveedorId !== undefined) out.proveedorId = proveedorId;
+
+  const tipoPagoOCId = trimString(raw, 'tipoPagoOCId');
+  if (tipoPagoOCId !== undefined) out.tipoPagoOCId = tipoPagoOCId;
+
+  const solicitanteId = trimString(raw, 'solicitanteId');
+  if (solicitanteId !== undefined) out.solicitanteId = solicitanteId;
 
   const page = raw['page'];
   if (typeof page === 'number' && Number.isFinite(page)) out.page = page;
@@ -262,22 +286,12 @@ function toAprobacionFiltros(raw: Record<string, unknown> | undefined | null): A
 
 function toKanbanAprobacionesFiltros(
   raw: Record<string, unknown> | undefined | null
-): {
-  expedienteId?: string;
-  entidadTipo?: EntidadTipoAprobacion;
-  limit?: number;
-} {
-  if (raw == null) return {};
-  const out: {
-    expedienteId?: string;
-    entidadTipo?: EntidadTipoAprobacion;
-    limit?: number;
-  } = {};
+): Parameters<AprobacionService['getKanbanDataAprobaciones']>[0] {
+  if (raw == null) return undefined;
+  const out: NonNullable<Parameters<AprobacionService['getKanbanDataAprobaciones']>[0]> = {};
 
-  const expedienteId = raw['expedienteId'];
-  if (typeof expedienteId === 'string' && expedienteId !== '') {
-    out.expedienteId = expedienteId;
-  }
+  const expedienteId = trimString(raw, 'expedienteId');
+  if (expedienteId !== undefined) out.expedienteId = expedienteId;
 
   const entidadTipo = raw['entidadTipo'];
   if (isEntidadTipoAprobacion(entidadTipo)) out.entidadTipo = entidadTipo;
@@ -285,7 +299,10 @@ function toKanbanAprobacionesFiltros(
   const limit = raw['limit'];
   if (typeof limit === 'number' && Number.isFinite(limit)) out.limit = limit;
 
-  return out;
+  const busqueda = trimString(raw, 'busqueda');
+  if (busqueda !== undefined) out.busqueda = busqueda;
+
+  return Object.keys(out).length > 0 ? out : undefined;
 }
 
 export class AprobacionResolver {
@@ -383,6 +400,19 @@ export class AprobacionResolver {
           },
           { required: true, allowedTypes: ['admin', 'proveedor'] }
         ),
+
+        detalleChecklistRevisionAprobacionPorTipoPago: async (
+          _: unknown,
+          { aprobacionId, tipoPagoOCId }: { aprobacionId: string; tipoPagoOCId: string }
+        ) => {
+          return await ErrorHandler.handleError(async () => {
+            const detalle = await this.checklistRevision.obtenerDetallePorAprobacionIdYtipoPagoOCId(
+              aprobacionId,
+              tipoPagoOCId
+            );
+            return mapDetalleChecklistRevisionGQL(detalle);
+          }, 'detalleChecklistRevisionAprobacionPorTipoPago');
+        },
 
         aprobacionRevisionPorEntidad: authGuard(
           async (

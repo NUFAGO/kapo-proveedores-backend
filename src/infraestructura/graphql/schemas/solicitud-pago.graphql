@@ -56,6 +56,12 @@ type SolicitudPago {
   tipoPagoOC: TipoPagoOC
 }
 
+
+type SolicitudPagoDetalleRevision {
+  solicitud: SolicitudPago!
+  revisionChecklist: AprobacionChecklistRevisionDetalle
+}
+
 # Queries para SolicitudPago
 extend type Query {
   # Obtener una solicitud de pago por ID
@@ -69,6 +75,20 @@ extend type Query {
   
   # Obtener solicitudes por tipo de pago
   obtenerSolicitudesPorTipoPago(tipoPagoOCId: String!): [SolicitudPago!]!
+
+  """
+  Busca por `SolicitudPago.ordenPagoVinculadoId` (mismo valor que `ordenPagoInaconsId` al vincular).
+  Sin guard JWT: consumo backend-to-backend; proteger en red/API gateway.
+  """
+  solicitudPagoDetalleByOrdenPagoId(ordenPagoId: String!): SolicitudPagoDetalleRevision!
+}
+
+input VincularSolicitudOrdenPagoInaconsInput {
+  solicitudPagoId: ID!
+  """Id de la orden de pago en Inacons."""
+  ordenPagoInaconsId: String!
+  """Id de la orden de compra en Inacons (debe coincidir con expediente.ocId)."""
+  ordenCompraInaconsId: String!
 }
 
 # Mutations para SolicitudPago
@@ -93,4 +113,7 @@ extend type Mutation {
   
   # Eliminar una solicitud de pago (solo si está en borrador)
   eliminarSolicitudPago(id: ID!): Boolean
+
+  """Vincula la solicitud aprobada con una OP de Inacons (solo admin / token de servicio)."""
+  vincularSolicitudConOrdenPagoInacons(input: VincularSolicitudOrdenPagoInaconsInput!): SolicitudPago!
 }

@@ -100,8 +100,9 @@ export class PlantillaChecklistMongoRepository extends BaseMongoRepository<Plant
       
       // Usar aggregation pipeline como en listarConRequisitos
       const pipeline: any[] = [
-        // Match por ID y activo (igual que listarConRequisitos)
-        { $match: { _id: objectId, activo: true } },
+        // Match solo por ID. No filtrar por activo: el modal de edición y los lugares
+        // que consumen una plantilla por id deben funcionar también para inactivas.
+        { $match: { _id: objectId } },
         
         // Agregar campo _id como string para el lookup
         {
@@ -310,9 +311,12 @@ export class PlantillaChecklistMongoRepository extends BaseMongoRepository<Plant
     offset = 0
   ): Promise<PlantillaChecklistConnection> {
     try {
-      // Construir filtros de MongoDB
-      const mongoFiltros: any = { activo: true };
-      
+      // Construir filtros de MongoDB. No filtrar por activo por defecto:
+      // los listados admin necesitan ver activas + inactivas. El filtro
+      // por activo solo se aplica cuando el caller lo pide explícitamente
+      // (ej. el modal de asignación de checklist en expediente envía activo: true).
+      const mongoFiltros: any = {};
+
       if (filtros) {
         if (filtros.codigo) {
           mongoFiltros.codigo = { $regex: filtros.codigo, $options: 'i' };

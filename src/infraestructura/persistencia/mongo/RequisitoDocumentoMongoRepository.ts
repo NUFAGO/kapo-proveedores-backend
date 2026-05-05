@@ -73,6 +73,10 @@ export class RequisitoDocumentoMongoRepository implements IRequisitoDocumentoRep
       query.formularioId = filtros.formularioId;
     }
 
+    if (filtros?.activo !== undefined) {
+      query.activo = filtros.activo;
+    }
+
     const documents = await RequisitoDocumentoModel
       .find(query)
       .sort({ checklistId: 1, orden: 1 });

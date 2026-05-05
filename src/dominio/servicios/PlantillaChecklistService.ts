@@ -69,6 +69,24 @@ export class PlantillaChecklistService {
       }
     }
 
+    // Validación de cambio de estado: bloquear reactivación si la categoría padre está inactiva
+    if (
+      input.activo !== undefined &&
+      input.activo !== existente.activo &&
+      input.activo === true
+    ) {
+      const categoriaIdAValidar = input.categoriaChecklistId || existente.categoriaChecklistId
+      const categoria = await this.categoriaRepository.obtenerCategoriaChecklist(categoriaIdAValidar)
+      if (!categoria) {
+        throw new Error('La categoría de checklist no existe')
+      }
+      if (categoria.estado === 'inactivo') {
+        throw new Error(
+          `No se puede activar la plantilla: su categoría '${categoria.nombre}' está inactiva. Reactívala primero.`
+        )
+      }
+    }
+
     return await this.plantillaRepository.actualizar(id, input)
   }
 

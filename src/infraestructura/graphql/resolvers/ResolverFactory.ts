@@ -179,18 +179,21 @@ export class ResolverFactory {
       return new AuthProveedorService(usuarioProveedorService);
     }, true);
     
-    // Registrar CategoriaChecklistService (usa CategoriaChecklistMongoRepository)
+    // Registrar CategoriaChecklistService (usa CategoriaChecklistMongoRepository + PlantillaChecklistMongoRepository para validar desactivación)
     container.register('CategoriaChecklistService', (c: any) => {
       const categoriaChecklistRepo = c.resolve('CategoriaChecklistMongoRepository');
-      return new CategoriaChecklistService(categoriaChecklistRepo);
+      const plantillaRepo = c.resolve('PlantillaChecklistMongoRepository');
+      return new CategoriaChecklistService(categoriaChecklistRepo, plantillaRepo);
     }, true);
-    
-    // Registrar PlantillaDocumentoService (usa PlantillaDocumentoMongoRepository)
+
+    // Registrar PlantillaDocumentoService (usa PlantillaDocumentoMongoRepository + RequisitoDocumentoMongoRepository + PlantillaChecklistMongoRepository para validar desactivación)
     container.register('PlantillaDocumentoService', (c: any) => {
       const plantillaDocumentoRepo = c.resolve('PlantillaDocumentoMongoRepository');
-      return new PlantillaDocumentoService(plantillaDocumentoRepo);
+      const requisitoRepo = c.resolve('RequisitoDocumentoMongoRepository');
+      const plantillaRepo = c.resolve('PlantillaChecklistMongoRepository');
+      return new PlantillaDocumentoService(plantillaDocumentoRepo, requisitoRepo, plantillaRepo);
     }, true);
-    
+
     // Registrar PlantillaChecklistService (usa PlantillaChecklistMongoRepository, CategoriaChecklistService y RequisitoDocumentoMongoRepository)
     container.register('PlantillaChecklistService', (c: any) => {
       const plantillaRepo = c.resolve('PlantillaChecklistMongoRepository');
@@ -198,12 +201,13 @@ export class ResolverFactory {
       const requisitoRepo = c.resolve('RequisitoDocumentoMongoRepository');
       return new PlantillaChecklistService(plantillaRepo, categoriaService, requisitoRepo);
     }, true);
-    
-    // Registrar RequisitoDocumentoService (usa RequisitoDocumentoMongoRepository y PlantillaDocumentoService)
+
+    // Registrar RequisitoDocumentoService (usa RequisitoDocumentoMongoRepository, PlantillaDocumentoService y PlantillaChecklistMongoRepository para validar reactivación)
     container.register('RequisitoDocumentoService', (c: any) => {
       const requisitoRepo = c.resolve('RequisitoDocumentoMongoRepository');
       const plantillaDocumentoService = c.resolve('PlantillaDocumentoService');
-      return new RequisitoDocumentoService(requisitoRepo, plantillaDocumentoService);
+      const plantillaRepo = c.resolve('PlantillaChecklistMongoRepository');
+      return new RequisitoDocumentoService(requisitoRepo, plantillaDocumentoService, plantillaRepo);
     }, true);
     
     // Registrar AuthResolver

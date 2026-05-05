@@ -1,8 +1,12 @@
 import { CategoriaChecklist, CategoriaChecklistInput, CategoriaChecklistFiltros, CategoriaChecklistConnection } from '../entidades/CategoriaChecklist';
 import { ICategoriaChecklistRepository } from '../repositorios/ICategoriaChecklistRepository';
+import { IPlantillaChecklistRepository } from '../repositorios/IPlantillaChecklistRepository';
 
 export class CategoriaChecklistService {
-  constructor(private readonly categoriaChecklistRepository: ICategoriaChecklistRepository) {}
+  constructor(
+    private readonly categoriaChecklistRepository: ICategoriaChecklistRepository,
+    private readonly plantillaChecklistRepository?: IPlantillaChecklistRepository
+  ) {}
 
   async crearCategoriaChecklist(input: CategoriaChecklistInput): Promise<CategoriaChecklist> {
     // Validaciones de negocio
@@ -37,8 +41,30 @@ export class CategoriaChecklistService {
       this.validarTipoUso(input.tipoUso);
     }
 
+    // Validación de cambio de estado: bloquear desactivación si hay plantillas activas usándola
+    if (
+      input.estado !== undefined &&
+      input.estado !== categoriaChecklistExistente.estado &&
+      input.estado === 'inactivo'
+    ) {
+      await this.validarSinPlantillasActivas(id);
+    }
+
     const categoriaChecklist = await this.categoriaChecklistRepository.actualizarCategoriaChecklist(id, input);
     return categoriaChecklist;
+  }
+
+  private async validarSinPlantillasActivas(categoriaChecklistId: string): Promise<void> {
+    if (!this.plantillaChecklistRepository) return;
+
+    const plantillas = await this.plantillaChecklistRepository.listarPorCategoria(categoriaChecklistId);
+    const activas = plantillas.filter(p => p.activo);
+    if (activas.length > 0) {
+      const nombres = activas.map(p => p.nombre).join(', ');
+      throw new Error(
+        `No se puede desactivar la categoría: hay ${activas.length} plantilla(s) activa(s) usándola: ${nombres}. Desactívalas primero.`
+      );
+    }
   }
 
   async eliminarCategoriaChecklist(id: string): Promise<boolean> {

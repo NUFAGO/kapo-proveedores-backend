@@ -1,15 +1,17 @@
-import { 
-  RequisitoDocumento, 
-  RequisitoDocumentoInput, 
-  RequisitoDocumentoFiltros 
+import {
+  RequisitoDocumento,
+  RequisitoDocumentoInput,
+  RequisitoDocumentoFiltros
 } from '../entidades/PlantillaChecklist'
 import { IRequisitoDocumentoRepository } from '../repositorios/IRequisitoDocumentoRepository'
 import { IPlantillaDocumentoRepository } from '../repositorios/IPlantillaDocumentoRepository'
+import { IPlantillaChecklistRepository } from '../repositorios/IPlantillaChecklistRepository'
 
 export class RequisitoDocumentoService {
   constructor(
     private requisitoRepository: IRequisitoDocumentoRepository,
-    private plantillaDocumentoRepository: IPlantillaDocumentoRepository
+    private plantillaDocumentoRepository: IPlantillaDocumentoRepository,
+    private plantillaChecklistRepository?: IPlantillaChecklistRepository
   ) {}
 
   async crear(input: RequisitoDocumentoInput): Promise<RequisitoDocumento> {
@@ -153,6 +155,35 @@ export class RequisitoDocumentoService {
     }
 
     const nuevoEstado = !existente.activo
+
+    // Validación upstream al reactivar: el checklist padre y la plantilla-documento
+    // referenciada deben estar activos.
+    if (nuevoEstado === true) {
+      if (this.plantillaChecklistRepository) {
+        const plantilla = await this.plantillaChecklistRepository.obtenerPorId(existente.checklistId)
+        if (!plantilla) {
+          throw new Error('La plantilla checklist padre no existe')
+        }
+        if (!plantilla.activo) {
+          throw new Error(
+            `No se puede activar el requisito: su plantilla checklist '${plantilla.nombre}' está inactiva. Reactívala primero.`
+          )
+        }
+      }
+
+      if (existente.tipoRequisito === 'documento' && existente.plantillaDocumentoId) {
+        const plantillaDoc = await this.plantillaDocumentoRepository.obtenerPlantillaDocumento(existente.plantillaDocumentoId)
+        if (!plantillaDoc) {
+          throw new Error('La plantilla de documento referenciada no existe')
+        }
+        if (!plantillaDoc.activo) {
+          throw new Error(
+            `No se puede activar el requisito: la plantilla-documento '${plantillaDoc.nombrePlantilla}' está inactiva. Reactívala primero.`
+          )
+        }
+      }
+    }
+
     return await this.requisitoRepository.actualizar(id, { activo: nuevoEstado })
   }
 

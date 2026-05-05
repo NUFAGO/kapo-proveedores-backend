@@ -82,25 +82,24 @@ PlantillaChecklistSchema.pre('save', async function(next) {
   // Si es un nuevo documento y no tiene código personalizado
   if (doc.isNew && !doc.isModified('codigo')) {
     try {
-      // Obtener el contador para la categoría
-      const CategoriaModel = doc.model('CategoriaChecklist')
-      const categoria = await CategoriaModel.findById(doc.categoriaChecklistId)
+      // Buscar el último código CHECK-XXX existente
+      const ultimaPlantilla = await doc.model('PlantillaChecklist')
+        .findOne({ codigo: { $regex: '^CHECK-' } })
+        .sort({ codigo: -1 })
       
-      if (categoria) {
-        // Generar código basado en categoría y contador: PREFIJO-NÚMERO
-        const prefijo = categoria.nombre.toUpperCase().substring(0, 3).replace(/[^A-Z]/g, '')
-        const contador = await doc.model('PlantillaChecklist').countDocuments({
-          categoriaChecklistId: doc.categoriaChecklistId
-        })
-        const numero = String(contador + 1).padStart(3, '0')
-        
-        doc.codigo = `${prefijo}-${numero}`
-      } else {
-        // Fallback a código aleatorio
-        const timestamp = Date.now().toString(36).toUpperCase()
-        const random = Math.random().toString(36).substring(2, 5).toUpperCase()
-        doc.codigo = `CHE-${timestamp}-${random}`
+      let contador = 1
+      if (ultimaPlantilla && ultimaPlantilla.codigo) {
+        // Extraer número del último código (ej: CHECK-005 -> 5)
+        const match = ultimaPlantilla.codigo.match(/^CHECK-(\d+)$/)
+        if (match) {
+          contador = parseInt(match[1]) + 1
+        }
       }
+      
+      // Generar nuevo código con 3 dígitos
+      const numero = String(contador).padStart(3, '0')
+      doc.codigo = `CHECK-${numero}`
+      
     } catch (error) {
       // Fallback a código aleatorio si hay error
       const timestamp = Date.now().toString(36).toUpperCase()

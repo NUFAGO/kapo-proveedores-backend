@@ -1,0 +1,39 @@
+# ============================================================================
+# SCHEMA DE CONTACTO DE PROVEEDOR (migrado desde inacons)
+# El tipo Proveedor se define en proveedor.graphql.
+# ============================================================================
+
+type ContactoProveedor {
+  id: ID
+  proveedor_id: Proveedor
+  nombres: String
+  apellidos: String
+  cargo: String
+  telefono: String
+}
+
+extend type Query {
+  listContactosProveedor: [ContactoProveedor!]!
+  listContactosByProveedor(proveedor_id: ID!): [ContactoProveedor!]!
+}
+
+extend type Mutation {
+  addContactoProveedor(
+    proveedor_id: ID!
+    nombres: String!
+    apellidos: String!
+    cargo: String!
+    telefono: String!
+  ): ContactoProveedor!
+
+  updateContactoProveedor(
+    id: ID!
+    proveedor_id: ID
+    nombres: String
+    apellidos: String
+    cargo: String
+    telefono: String
+  ): ContactoProveedor
+
+  deleteContactoProveedor(id: ID!): ContactoProveedor
+}

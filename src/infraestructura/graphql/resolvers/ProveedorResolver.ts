@@ -1,131 +1,75 @@
 import { IResolvers } from '@graphql-tools/utils';
 import { ProveedorService } from '../../../aplicacion/servicios/ProveedorService';
-import { BaseResolver } from './BaseResolver';
+import { ProveedorInput, ProveedorPaginationInput } from '../../../dominio/entidades/Proveedor';
 import { ErrorHandler } from './ErrorHandler';
 
 /**
- * Resolver para consumir Proveedores del inacons-backend
- * Expone los endpoints de proveedores en el GraphQL de kapo-proveedores-backend
+ * Resolver de Proveedor. Nombres y campos idénticos al contrato de inacons.
+ * Consume el ProveedorService (datos propios en Mongo).
  */
-export class ProveedorResolver extends BaseResolver<any> {
-  constructor(private readonly proveedorService: ProveedorService) {
-    super(proveedorService as any);
-  }
+export class ProveedorResolver {
+  constructor(private readonly proveedorService: ProveedorService) {}
 
-  /**
-   * Implementa los resolvers para consultas y mutaciones de proveedores
-   */
-  override getResolvers(): IResolvers {
+  getResolvers(): IResolvers {
     return {
       Query: {
-        // Listar todos los proveedores con relaciones completas
-        listProveedor: async () => {
-          return await ErrorHandler.handleError(
-            async () => {
-              return await this.proveedorService.listarProveedores();
-            },
+        listProveedor: () =>
+          ErrorHandler.handleError(
+            () => this.proveedorService.listarProveedores(),
             'listProveedor',
             {}
-          );
-        },
-
-        // Listar proveedores paginados con filtros
-        listProveedoresPaginated: async (_: any, { filter }: { filter?: Record<string, any> }) => {
-          return await ErrorHandler.handleError(
-            async () => {
-              return await this.proveedorService.listarProveedoresPaginados(filter);
-            },
+          ),
+        listProveedoresPaginated: (_: unknown, { filter }: { filter?: ProveedorPaginationInput }) =>
+          ErrorHandler.handleError(
+            () => this.proveedorService.listarProveedoresPaginados(filter),
             'listProveedoresPaginated',
             { filter }
-          );
-        },
-
-        // Obtener proveedor por ID con relaciones completas
-        getProveedorById: async (_: any, { id }: { id: string }) => {
-          return await ErrorHandler.handleError(
-            async () => {
-              return await this.proveedorService.obtenerProveedorPorId(id);
-            },
+          ),
+        getProveedorById: (_: unknown, { id }: { id: string }) =>
+          ErrorHandler.handleError(
+            () => this.proveedorService.obtenerProveedorPorId(id),
             'getProveedorById',
             { id }
-          );
-        },
-
-        // Buscar proveedor por RUC
-        getProveedorByRuc: async (_: any, { ruc }: { ruc: string }) => {
-          return await ErrorHandler.handleError(
-            async () => {
-              return await this.proveedorService.buscarProveedorPorRuc(ruc);
-            },
+          ),
+        getProveedorByRuc: (_: unknown, { ruc }: { ruc: string }) =>
+          ErrorHandler.handleError(
+            () => this.proveedorService.buscarProveedorPorRuc(ruc),
             'getProveedorByRuc',
             { ruc }
-          );
-        },
-
-        // Listar proveedores con subcontratación habilitada
-        listProveedoresSubContrata: async () => {
-          return await ErrorHandler.handleError(
-            async () => {
-              return await this.proveedorService.listarProveedoresSubContrata();
-            },
+          ),
+        listProveedoresSubContrata: () =>
+          ErrorHandler.handleError(
+            () => this.proveedorService.listarProveedoresSubContrata(),
             'listProveedoresSubContrata',
             {}
-          );
-        },
-
-        // Obtener estadísticas de cotizaciones por proveedor
-        getEstadisticasCotizaciones: async (_: any, { proveedorId }: { proveedorId: string }) => {
-          return await ErrorHandler.handleError(
-            async () => {
-              return await this.proveedorService.obtenerEstadisticasCotizaciones(proveedorId);
-            },
+          ),
+        getEstadisticasCotizaciones: (_: unknown, { proveedorId }: { proveedorId: string }) =>
+          ErrorHandler.handleError(
+            () => this.proveedorService.obtenerEstadisticasCotizaciones(proveedorId),
             'getEstadisticasCotizaciones',
             { proveedorId }
-          );
-        },
+          ),
       },
-
       Mutation: {
-        // Crear nuevo proveedor
-        addProveedor: async (_: any, { input }: { input: any }) => {
-          return await ErrorHandler.handleError(
-            async () => {
-              return await this.proveedorService.crearProveedor(input);
-            },
+        addProveedor: (_: unknown, args: ProveedorInput) =>
+          ErrorHandler.handleError(
+            () => this.proveedorService.crearProveedor(args),
             'addProveedor',
-            { input }
-          );
-        },
-
-        // Actualizar proveedor existente
-        updateProveedor: async (_: any, { id, input }: { id: string; input: any }) => {
-          return await ErrorHandler.handleError(
-            async () => {
-              return await this.proveedorService.actualizarProveedor(id, input);
-            },
+            { ruc: args.ruc }
+          ),
+        updateProveedor: (_: unknown, { id, ...rest }: { id: string } & ProveedorInput) =>
+          ErrorHandler.handleError(
+            () => this.proveedorService.actualizarProveedor(id, rest),
             'updateProveedor',
-            { id, input }
-          );
-        },
-
-        // Eliminar proveedor
-        deleteProveedor: async (_: any, { id }: { id: string }) => {
-          return await ErrorHandler.handleError(
-            async () => {
-              return await this.proveedorService.eliminarProveedor(id);
-            },
+            { id }
+          ),
+        deleteProveedor: (_: unknown, { id }: { id: string }) =>
+          ErrorHandler.handleError(
+            () => this.proveedorService.eliminarProveedor(id),
             'deleteProveedor',
             { id }
-          );
-        },
+          ),
       },
     };
-  }
-
-  /**
-   * Método abstracto requerido por BaseResolver
-   */
-  protected getEntityName(): string {
-    return 'Proveedor';
   }
 }

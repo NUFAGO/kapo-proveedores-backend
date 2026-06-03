@@ -178,6 +178,10 @@ export class UploadResolver {
         return FileUploadService.DOCUMENTOS_PROVEEDOR_CONFIG;
       case 'LOGOS_PROVEEDOR':
         return FileUploadService.LOGOS_PROVEEDOR_CONFIG;
+      case 'EMPRESA':
+        return FileUploadService.EMPRESA_CONFIG;
+      case 'MEDIO_PAGO':
+        return FileUploadService.MEDIO_PAGO_CONFIG;
       case 'PLANTILLAS_DOCUMENTO':
         return FileUploadService.PLANTILLAS_DOCUMENTO_CONFIG;
       case 'EVIDENCIAS_PAGO':

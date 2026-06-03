@@ -7,6 +7,7 @@ import { AuthResolver } from './AuthResolver';
 import { AuthAdminResolver } from './AuthAdminResolver';
 import { AuthProveedorResolver } from './AuthProveedorResolver';
 import { UsuarioProveedorResolver } from './UsuarioProveedorResolver';
+import { UsuarioExternoResolver } from './UsuarioExternoResolver';
 import { CategoriaChecklistResolver } from './CategoriaChecklistResolver';
 import { PlantillaDocumentoResolver } from './PlantillaDocumentoResolver';
 import { PlantillaChecklistResolver } from './PlantillaChecklistResolver';
@@ -17,6 +18,14 @@ import { TipoPagoOCResolver } from './TipoPagoOCResolver';
 import { DocumentoOCResolver } from './DocumentoOCResolver';
 import { DocumentoSubidoResolver } from './DocumentoSubidoResolver';
 import { ProveedorResolver } from './ProveedorResolver';
+import { BancoResolver } from './BancoResolver';
+import { EmpresaResolver } from './EmpresaResolver';
+import { MediosPagoEmpresaResolver } from './MediosPagoEmpresaResolver';
+import { ContactoProveedorResolver } from './ContactoProveedorResolver';
+import { MediosPagoProveedorResolver } from './MediosPagoProveedorResolver';
+import { RucResolver } from './RucResolver';
+import { ComentarioProveedorResolver } from './ComentarioProveedorResolver';
+import { ArchivoSustentoProveedorResolver } from './ArchivoSustentoProveedorResolver';
 import { CodigoAccesoResolver } from './CodigoAccesoResolver';
 import { AprobacionResolver } from './AprobacionResolver';
 import { ChecklistProveedorResolver } from './ChecklistProveedorResolver';
@@ -25,6 +34,7 @@ import { ReporteSolicitudPagoResolver } from './ReporteSolicitudPagoResolver';
 import { DashboardResolver } from './DashboardResolver';
 import { Container } from '../../di/Container';
 import { AuthService } from '../../../aplicacion/servicios/AuthService';
+import { UsuarioExternoService } from '../../../aplicacion/servicios/UsuarioExternoService';
 import { AuthAdminService } from '../../../aplicacion/servicios/AuthAdminService';
 import { AuthProveedorService } from '../../../aplicacion/servicios/AuthProveedorService';
 import { UsuarioProveedorService } from '../../../aplicacion/servicios/UsuarioProveedorService';
@@ -37,6 +47,22 @@ import { ExpedientePagoService } from '../../../dominio/servicios/ExpedientePago
 import { TipoPagoOCService } from '../../../dominio/servicios/TipoPagoOCService';
 import { DocumentoOCService } from '../../../dominio/servicios/DocumentoOCService';
 import { ProveedorService } from '../../../aplicacion/servicios/ProveedorService';
+import { BancoService } from '../../../aplicacion/servicios/BancoService';
+import { EmpresaService } from '../../../aplicacion/servicios/EmpresaService';
+import { MediosPagoEmpresaService } from '../../../aplicacion/servicios/MediosPagoEmpresaService';
+import { ContactoProveedorService } from '../../../aplicacion/servicios/ContactoProveedorService';
+import { MediosPagoProveedorService } from '../../../aplicacion/servicios/MediosPagoProveedorService';
+import { ProveedorMongoRepository } from '../../persistencia/mongo/ProveedorMongoRepository';
+import { BancoMongoRepository } from '../../persistencia/mongo/BancoMongoRepository';
+import { EmpresaMongoRepository } from '../../persistencia/mongo/EmpresaMongoRepository';
+import { MediosPagoEmpresaMongoRepository } from '../../persistencia/mongo/MediosPagoEmpresaMongoRepository';
+import { ContactoProveedorMongoRepository } from '../../persistencia/mongo/ContactoProveedorMongoRepository';
+import { MediosPagoProveedorMongoRepository } from '../../persistencia/mongo/MediosPagoProveedorMongoRepository';
+import { RucService } from '../../../aplicacion/servicios/RucService';
+import { ComentarioProveedorService } from '../../../aplicacion/servicios/ComentarioProveedorService';
+import { ComentarioProveedorMongoRepository } from '../../persistencia/mongo/ComentarioProveedorMongoRepository';
+import { ArchivoSustentoProveedorService } from '../../../aplicacion/servicios/ArchivoSustentoProveedorService';
+import { ArchivoSustentoProveedorMongoRepository } from '../../persistencia/mongo/ArchivoSustentoProveedorMongoRepository';
 import { CodigoAccesoService } from '../../../aplicacion/servicios/CodigoAccesoService';
 import { AprobacionService } from '../../../dominio/servicios/AprobacionService';
 import { AprobacionChecklistRevisionService } from '../../../dominio/servicios/AprobacionChecklistRevisionService';
@@ -160,6 +186,16 @@ export class ResolverFactory {
       const httpAuthRepo = c.resolve('HttpAuthRepository');
       return new AuthService(httpAuthRepo);
     }, true);
+
+    container.register('UsuarioExternoService', (c: any) => {
+      const httpAuthRepo = c.resolve('HttpAuthRepository');
+      return new UsuarioExternoService(httpAuthRepo);
+    }, true);
+
+    container.register('UsuarioExternoResolver', (c: any) => {
+      const svc = c.resolve('UsuarioExternoService');
+      return new UsuarioExternoResolver(svc);
+    }, true);
     
     // Registrar UsuarioProveedorService (usuarios locales)
     container.register('UsuarioProveedorService', (c: any) => {
@@ -259,8 +295,45 @@ export class ResolverFactory {
     // Registrar OrdenCompraService
     container.register('OrdenCompraService', () => new OrdenCompraService(), true);
     
-    // Registrar ProveedorService
-    container.register('ProveedorService', () => new ProveedorService(), true);
+    // ============================================================
+    // Catálogos migrados desde inacons (Proveedor, Empresa, Banco)
+    // ============================================================
+    // Repositorios Mongo
+    container.register('ProveedorMongoRepository', () => new ProveedorMongoRepository(), true);
+    container.register('BancoMongoRepository', () => new BancoMongoRepository(), true);
+    container.register('EmpresaMongoRepository', () => new EmpresaMongoRepository(), true);
+    container.register('MediosPagoEmpresaMongoRepository', () => new MediosPagoEmpresaMongoRepository(), true);
+    container.register('ContactoProveedorMongoRepository', () => new ContactoProveedorMongoRepository(), true);
+    container.register('MediosPagoProveedorMongoRepository', () => new MediosPagoProveedorMongoRepository(), true);
+
+    // Registrar ProveedorService (ahora consume Mongo, no HTTP)
+    container.register('ProveedorService', (c: any) =>
+      new ProveedorService(c.resolve('ProveedorMongoRepository')), true);
+
+    // Servicios de los catálogos migrados
+    container.register('BancoService', (c: any) =>
+      new BancoService(c.resolve('BancoMongoRepository')), true);
+    container.register('EmpresaService', (c: any) =>
+      new EmpresaService(c.resolve('EmpresaMongoRepository')), true);
+    container.register('MediosPagoEmpresaService', (c: any) =>
+      new MediosPagoEmpresaService(c.resolve('MediosPagoEmpresaMongoRepository')), true);
+    container.register('ContactoProveedorService', (c: any) =>
+      new ContactoProveedorService(c.resolve('ContactoProveedorMongoRepository')), true);
+    container.register('MediosPagoProveedorService', (c: any) =>
+      new MediosPagoProveedorService(c.resolve('MediosPagoProveedorMongoRepository')), true);
+
+    // Servicio de consulta de RUC (usa modelos Mongo directamente para caché)
+    container.register('RucService', () => new RucService(), true);
+
+    // ComentarioProveedor (trazabilidad)
+    container.register('ComentarioProveedorMongoRepository', () => new ComentarioProveedorMongoRepository(), true);
+    container.register('ComentarioProveedorService', (c: any) =>
+      new ComentarioProveedorService(c.resolve('ComentarioProveedorMongoRepository')), true);
+
+    // ArchivoSustentoProveedor (sustentos de medios de pago)
+    container.register('ArchivoSustentoProveedorMongoRepository', () => new ArchivoSustentoProveedorMongoRepository(), true);
+    container.register('ArchivoSustentoProveedorService', (c: any) =>
+      new ArchivoSustentoProveedorService(c.resolve('ArchivoSustentoProveedorMongoRepository')), true);
     
     // Registrar CodigoAccesoMongoRepository
     container.register('CodigoAccesoMongoRepository', () => new CodigoAccesoMongoRepository(), true);
@@ -283,6 +356,24 @@ export class ResolverFactory {
       const proveedorService = c.resolve('ProveedorService');
       return new ProveedorResolver(proveedorService);
     }, true);
+
+    // Resolvers de los catálogos migrados
+    container.register('BancoResolver', (c: any) =>
+      new BancoResolver(c.resolve('BancoService')), true);
+    container.register('EmpresaResolver', (c: any) =>
+      new EmpresaResolver(c.resolve('EmpresaService')), true);
+    container.register('MediosPagoEmpresaResolver', (c: any) =>
+      new MediosPagoEmpresaResolver(c.resolve('MediosPagoEmpresaService')), true);
+    container.register('ContactoProveedorResolver', (c: any) =>
+      new ContactoProveedorResolver(c.resolve('ContactoProveedorService')), true);
+    container.register('MediosPagoProveedorResolver', (c: any) =>
+      new MediosPagoProveedorResolver(c.resolve('MediosPagoProveedorService')), true);
+    container.register('RucResolver', (c: any) =>
+      new RucResolver(c.resolve('RucService')), true);
+    container.register('ComentarioProveedorResolver', (c: any) =>
+      new ComentarioProveedorResolver(c.resolve('ComentarioProveedorService')), true);
+    container.register('ArchivoSustentoProveedorResolver', (c: any) =>
+      new ArchivoSustentoProveedorResolver(c.resolve('ArchivoSustentoProveedorService')), true);
     
     // Registrar ExpedientePagoResolver
     container.register('ExpedientePagoResolver', (c: any) => {
@@ -457,6 +548,10 @@ export class ResolverFactory {
       const usuarioProveedorResolver = container.resolve<UsuarioProveedorResolver>('UsuarioProveedorResolver');
       resolvers.push(usuarioProveedorResolver.getResolvers());
       logger.debug('Resolver configurado: usuarioProveedor');
+
+      const usuarioExternoResolver = container.resolve<UsuarioExternoResolver>('UsuarioExternoResolver');
+      resolvers.push(usuarioExternoResolver.getResolvers());
+      logger.debug('Resolver configurado: usuarioExterno');
       
       // Crear CategoriaChecklistResolver
       const categoriaChecklistResolver = container.resolve<CategoriaChecklistResolver>('CategoriaChecklistResolver');
@@ -487,6 +582,39 @@ export class ResolverFactory {
       const proveedorResolver = container.resolve<ProveedorResolver>('ProveedorResolver');
       resolvers.push(proveedorResolver.getResolvers());
       logger.debug('Resolver configurado: proveedor');
+
+      // Resolvers de catálogos migrados desde inacons
+      const bancoResolver = container.resolve<BancoResolver>('BancoResolver');
+      resolvers.push(bancoResolver.getResolvers());
+      logger.debug('Resolver configurado: banco');
+
+      const empresaResolver = container.resolve<EmpresaResolver>('EmpresaResolver');
+      resolvers.push(empresaResolver.getResolvers());
+      logger.debug('Resolver configurado: empresa');
+
+      const mediosPagoEmpresaResolver = container.resolve<MediosPagoEmpresaResolver>('MediosPagoEmpresaResolver');
+      resolvers.push(mediosPagoEmpresaResolver.getResolvers());
+      logger.debug('Resolver configurado: mediosPagoEmpresa');
+
+      const contactoProveedorResolver = container.resolve<ContactoProveedorResolver>('ContactoProveedorResolver');
+      resolvers.push(contactoProveedorResolver.getResolvers());
+      logger.debug('Resolver configurado: contactoProveedor');
+
+      const mediosPagoProveedorResolver = container.resolve<MediosPagoProveedorResolver>('MediosPagoProveedorResolver');
+      resolvers.push(mediosPagoProveedorResolver.getResolvers());
+      logger.debug('Resolver configurado: mediosPagoProveedor');
+
+      const rucResolver = container.resolve<RucResolver>('RucResolver');
+      resolvers.push(rucResolver.getResolvers());
+      logger.debug('Resolver configurado: ruc');
+
+      const comentarioProveedorResolver = container.resolve<ComentarioProveedorResolver>('ComentarioProveedorResolver');
+      resolvers.push(comentarioProveedorResolver.getResolvers());
+      logger.debug('Resolver configurado: comentarioProveedor');
+
+      const archivoSustentoProveedorResolver = container.resolve<ArchivoSustentoProveedorResolver>('ArchivoSustentoProveedorResolver');
+      resolvers.push(archivoSustentoProveedorResolver.getResolvers());
+      logger.debug('Resolver configurado: archivoSustentoProveedor');
       
       // Crear ExpedientePagoResolver
       const expedientePagoResolver = container.resolve<ExpedientePagoResolver>('ExpedientePagoResolver');

@@ -1,0 +1,45 @@
+# ============================================================================
+# SCHEMA DE MEDIOS DE PAGO DE EMPRESA (migrado desde inacons)
+# Contrato idéntico a inacons.
+# ============================================================================
+
+type MediosPagoEmpresa {
+  id: ID
+  empresa_id: Empresa
+  entidad: String!
+  nro_cuenta: String!
+  detalles: String
+  titular: String
+  validado: Boolean
+}
+
+type MediosPagoEmpresaGrouped {
+  empresa_id: Empresa!
+  medios_pago: [MediosPagoEmpresa!]!
+}
+
+extend type Query {
+  listMediosPagoEmpresas: [MediosPagoEmpresaGrouped!]!
+  listMediosPagoEmpresaByEmpresa(empresa_id: ID!): [MediosPagoEmpresa!]!
+}
+
+extend type Mutation {
+  addMediosPagoEmpresa(
+    empresa_id: ID!
+    entidad: String!
+    nro_cuenta: String!
+    detalles: String
+    titular: String!
+  ): MediosPagoEmpresa!
+
+  updateMediosPagoEmpresa(
+    id: ID!
+    empresa_id: ID
+    entidad: String
+    nro_cuenta: String
+    detalles: String
+    titular: String
+  ): MediosPagoEmpresa
+
+  deleteMediosPagoEmpresa(id: ID!): MediosPagoEmpresa
+}

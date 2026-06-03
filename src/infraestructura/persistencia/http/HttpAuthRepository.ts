@@ -1,10 +1,14 @@
 import { IAuthRepository } from '../../../dominio/repositorios/IAuthRepository';
+import { IUsuarioExternoRepository } from '../../../dominio/repositorios/IUsuarioExternoRepository';
 import { LoginRequest, LoginResponse } from '../../../dominio/entidades/Auth';
 import { UsuarioExternoResponse } from '../../../dominio/entidades/UsuarioExterno';
 import { GraphQLClient } from '../../http/GraphQLClient';
 import { BaseHttpRepository } from './BaseHttpRepository';
 
-export class HttpAuthRepository extends BaseHttpRepository<any> implements IAuthRepository {
+export class HttpAuthRepository
+  extends BaseHttpRepository<any>
+  implements IAuthRepository, IUsuarioExternoRepository
+{
   constructor(baseUrl?: string) {
     super(baseUrl);
   }
@@ -187,6 +191,38 @@ export class HttpAuthRepository extends BaseHttpRepository<any> implements IAuth
 
     const result = await this.graphqlRequest(query);
     return result.usuariosCargo;
+  }
+
+  async getUsuariosByRolCargo(
+    jerarquia?: number,
+    rolRegex?: string
+  ): Promise<UsuarioExternoResponse[]> {
+    const query = `
+      query GetUsuariosByRolCargo($jerarquia: Int, $rolRegex: String) {
+        getUsuariosByRolCargo(jerarquia: $jerarquia, rolRegex: $rolRegex) {
+          id
+          nombres
+          apellidos
+          usuario
+          dni
+          rol_id
+          telefono
+          email
+          cargo_id {
+            id
+            nombre
+            descripcion
+            gerarquia
+          }
+        }
+      }
+    `;
+
+    const result = await this.graphqlRequest(query, {
+      jerarquia: jerarquia ?? null,
+      rolRegex: rolRegex ?? null,
+    });
+    return result.getUsuariosByRolCargo ?? [];
   }
 
   async getUsuariosByRegistrosGeneralesContables(): Promise<UsuarioExternoResponse[]> {

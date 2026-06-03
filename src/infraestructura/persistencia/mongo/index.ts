@@ -22,6 +22,17 @@ import './schemas/CodigoAccesoSchema';
 
 import './schemas/AprobacionSchema';
 
+// Catálogos migrados desde inacons (Proveedor, Empresa, Banco y dependencias)
+import './schemas/BancoSchema';
+import './schemas/EmpresaSchema';
+import './schemas/MediosPagoEmpresaSchema';
+import './schemas/ProveedorSchema';
+import './schemas/ContactoProveedorSchema';
+import './schemas/MediosPagoProveedorSchema';
+import './schemas/RucCacheSchema';
+import './schemas/ComentarioProveedorSchema';
+import './schemas/ArchivoSustentoProveedorSchema';
+
 // Los modelos ya se registran automáticamente con mongoose.model() en cada schema
 // No necesitamos exportar nada aquí, solo asegurar que los archivos se importen
 
@@ -39,3 +50,11 @@ export * from './schemas/SolicitudPagoSchema';
 export * from './schemas/ReporteSolicitudPagoSchema';
 export * from './schemas/CodigoAccesoSchema';
 export * from './schemas/AprobacionSchema';
+
+// Catálogos migrados desde inacons
+export * from './schemas/BancoSchema';
+export * from './schemas/EmpresaSchema';
+export * from './schemas/MediosPagoEmpresaSchema';
+export * from './schemas/ProveedorSchema';
+export * from './schemas/ContactoProveedorSchema';
+export * from './schemas/MediosPagoProveedorSchema';

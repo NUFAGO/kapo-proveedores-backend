@@ -1,0 +1,49 @@
+# ============================================================================
+# SCHEMA DE EMPRESA (catálogo migrado desde inacons)
+# NOTA: en inacons `imagenes` usa `Upload`. Aquí se expone como String (URL),
+# la subida real de archivos no está cableada en esta migración.
+# ============================================================================
+
+type Empresa {
+  id: ID!
+  nombre_comercial: String!
+  razon_social: String!
+  descripcion: String
+  estado: String!
+  regimen_fiscal: String!
+  ruc: String!
+  imagenes: String
+  color: String
+}
+
+extend type Query {
+  listEmpresas: [Empresa!]!
+  getEmpresa(id: ID!): Empresa
+}
+
+extend type Mutation {
+  addEmpresa(
+    nombre_comercial: String!
+    razon_social: String!
+    descripcion: String
+    estado: String!
+    regimen_fiscal: String!
+    ruc: String!
+    imagenes: String
+    color: String
+  ): Empresa!
+
+  updateEmpresa(
+    id: ID!
+    nombre_comercial: String
+    razon_social: String
+    descripcion: String
+    estado: String
+    regimen_fiscal: String
+    ruc: String
+    imagenes: String
+    color: String
+  ): Empresa
+
+  deleteEmpresa(id: ID!): Empresa
+}

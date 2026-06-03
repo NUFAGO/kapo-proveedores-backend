@@ -363,6 +363,36 @@ export class FileUploadService {
     };
   }
 
+  /** Logos / imágenes de catálogo empresa (misma carpeta que inacons: `empresas`). */
+  static get EMPRESA_CONFIG(): FileUploadConfig {
+    return {
+      folder: "empresas",
+      maxFileSize: 5 * 1024 * 1024, // 5MB
+      allowedMimeTypes: [
+        "image/jpeg", "image/png", "image/webp", "image/gif"
+      ],
+      optimizeImages: true,
+      generateUniqueNames: true
+    };
+  }
+
+  /**
+   * Sustentos de medios de pago de proveedor.
+   * Misma RUTA que inacons: carpeta `sustentos/medio_pago` (el bucket lo define el entorno).
+   */
+  static get MEDIO_PAGO_CONFIG(): FileUploadConfig {
+    return {
+      folder: "sustentos/medio_pago",
+      maxFileSize: 10 * 1024 * 1024, // 10MB
+      allowedMimeTypes: [
+        "application/pdf",
+        "image/jpeg", "image/png", "image/webp", "image/gif"
+      ],
+      optimizeImages: true,
+      generateUniqueNames: true
+    };
+  }
+
   static get PLANTILLAS_DOCUMENTO_CONFIG(): FileUploadConfig {
     return {
       folder: "kapoproveedores/plantillas-documentos",

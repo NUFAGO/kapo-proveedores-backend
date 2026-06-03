@@ -1,0 +1,21 @@
+# ============================================================================
+# SCHEMA DE BANCO (catálogo migrado desde inacons)
+# Contrato idéntico a inacons para no romper consumidores.
+# ============================================================================
+
+type Banco {
+  id: ID
+  nombre: String
+  abreviatura: String
+}
+
+extend type Query {
+  listBancos: [Banco!]!
+  getBancoById(id: ID!): Banco
+}
+
+extend type Mutation {
+  addBanco(nombre: String!, abreviatura: String!): Banco!
+  updateBanco(id: ID!, nombre: String, abreviatura: String): Banco
+  deleteBanco(id: ID!): Banco
+}

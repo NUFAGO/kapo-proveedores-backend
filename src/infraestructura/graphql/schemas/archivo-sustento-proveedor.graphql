@@ -1,0 +1,20 @@
+# ============================================================================
+# SCHEMA DE ARCHIVO SUSTENTO PROVEEDOR (sustentos de medios de pago)
+# Colección propia 'archivo_sustento_proveedor'. La URL del binario (GCS) en `url`.
+# ============================================================================
+
+type ArchivoSustentoProveedor {
+  id: ID!
+  url: String!
+  referencia_id: ID!
+  tipo: String!
+}
+
+extend type Query {
+  getArchivosSustentoProveedor(referencia_id: ID!, tipo: String!): [ArchivoSustentoProveedor!]!
+}
+
+extend type Mutation {
+  registrarArchivoSustentoProveedor(url: String!, referencia_id: ID!, tipo: String!): ArchivoSustentoProveedor!
+  eliminarArchivoSustentoProveedor(id: ID!): Boolean!
+}

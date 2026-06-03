@@ -1,0 +1,67 @@
+# ============================================================================
+# SCHEMA DE MEDIOS DE PAGO DE PROVEEDOR (migrado desde inacons)
+# Los tipos Proveedor y Banco se definen en proveedor.graphql y banco.graphql.
+# NOTA: las queries listMediosPagoProveedorLitleBox y
+# listMediosPagoProveedorNoValidadoWithArchivo de inacons NO se migran
+# (dependen de archivos_sustento / horario fuera de alcance).
+# ============================================================================
+
+type MediosPagoProveedor {
+  id: ID
+  proveedor_id: Proveedor
+  entidad: Banco
+  nro_cuenta: String
+  detalles: String
+  titular: String
+  validado: Boolean
+  mostrar: Boolean
+}
+
+type MediosPagoProveedorPaginatedResponse {
+  data: [MediosPagoProveedor!]!
+  total: Int!
+  page: Int!
+  limit: Int!
+  totalPages: Int!
+}
+
+extend type Query {
+  listMediosPagoProveedores: [MediosPagoProveedor!]!
+  listMediosPagoProveedorByProveedor(proveedor_id: ID!): [MediosPagoProveedor!]!
+  listMediosPagoProveedorNoValidado(page: Int, limit: Int, search: String): MediosPagoProveedorPaginatedResponse!
+}
+
+extend type Mutation {
+  addMediosPagoProveedor(
+    proveedor_id: ID!
+    entidad: ID
+    nro_cuenta: String
+    detalles: String
+    titular: String
+    validado: Boolean
+    mostrar: Boolean
+  ): MediosPagoProveedor!
+
+  # Crea el medio + sus archivos de sustento de forma atómica (las URLs ya subidas a GCS).
+  crearMedioPagoConSustentos(
+    proveedor_id: ID!
+    entidad: ID
+    nro_cuenta: String
+    detalles: String
+    titular: String
+    urls: [String!]!
+  ): MediosPagoProveedor
+
+  updateMediosPagoProveedor(
+    id: ID!
+    proveedor_id: ID
+    entidad: ID
+    nro_cuenta: String
+    detalles: String
+    titular: String
+    validado: Boolean
+    mostrar: Boolean
+  ): MediosPagoProveedor
+
+  deleteMediosPagoProveedor(id: ID!): MediosPagoProveedor
+}

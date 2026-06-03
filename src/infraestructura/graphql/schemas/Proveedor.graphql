@@ -1,15 +1,19 @@
 # ============================================================================
-# SCHEMA DE PROVEEDORES
+# SCHEMA DE PROVEEDORES (migrado a Mongo, contrato idéntico a inacons)
+# - Banco, MediosPagoProveedor y ContactoProveedor viven en sus propios schemas.
+# - estadisticasCotizaciones / getEstadisticasCotizaciones se eliminaron
+#   (cotizaciones NO se migra).
+# - Mutaciones con argumentos posicionales, igual que inacons.
 # ============================================================================
 
 type Proveedor {
     id: ID!
-    razon_social: String!
+    razon_social: String
     direccion: String
     nombre_comercial: String
-    ruc: String!
+    ruc: String
     rubro: String
-    estado: String!
+    estado: String
     tipo: String
     actividad: String
     correo: String
@@ -21,56 +25,13 @@ type Proveedor {
     distrito: String
     provincia: String
     departamento: String
-    
+
     # Relaciones
     mediosPago: [MediosPagoProveedor]
     contactos: [ContactoProveedor]
+    # NOTA: se conserva en el contrato por compatibilidad, pero NO se calcula
+    # (cotizaciones vive en compras y no se migró) -> devuelve null.
     estadisticasCotizaciones: EstadisticasDetalladas
-}
-
-type ProveedorBasico {
-    id: ID!
-    razon_social: String!
-    direccion: String
-    nombre_comercial: String
-    ruc: String!
-    rubro: String
-    estado: String!
-    tipo: String
-    actividad: String
-    correo: String
-    telefono: String
-    estado_sunat: String
-    condicion: String
-    agente_retencion: Boolean
-    sub_contrata: Boolean
-    distrito: String
-    provincia: String
-    departamento: String
-}
-
-type MediosPagoProveedor {
-    id: ID!
-    entidad: Banco
-    nro_cuenta: String
-    detalles: String
-    titular: String
-    validado: Boolean!
-    mostrar: Boolean!
-}
-
-type Banco {
-    id: ID
-    nombre: String
-    abreviatura: String
-}
-
-type ContactoProveedor {
-    id: ID!
-    nombres: String!
-    apellidos: String!
-    cargo: String
-    telefono: String
 }
 
 type CotizacionPorEstado {
@@ -88,12 +49,12 @@ type EstadisticasDetalladas {
     ultimaCotizacion: String
 }
 
-# Input para crear/actualizar proveedor
-input ProveedorInput {
-    razon_social: String!
-    ruc: String!
+type ProveedorBasico {
+    id: ID
+    razon_social: String
     direccion: String
     nombre_comercial: String
+    ruc: String
     rubro: String
     estado: String
     tipo: String
@@ -109,7 +70,6 @@ input ProveedorInput {
     departamento: String
 }
 
-# Tipo de respuesta paginada para proveedores
 type ProveedorPaginatedResponse {
     data: [Proveedor!]!
     total: Int!
@@ -118,9 +78,9 @@ type ProveedorPaginatedResponse {
     totalPages: Int!
 }
 
-# Input para filtros de proveedores
 input ProveedorFilterInput {
     estado: String
+    estados: [String]
     tipo: String
     rubro: String
     sub_contrata: Boolean
@@ -130,7 +90,6 @@ input ProveedorFilterInput {
     searchTerm: String
 }
 
-# Input para paginación de proveedores
 input ProveedorPaginationInput {
     page: Int
     limit: Int
@@ -139,41 +98,57 @@ input ProveedorPaginationInput {
     filter: ProveedorFilterInput
 }
 
-# ============================================================================
-# QUERIES
-# ============================================================================
-
-type Query {
-    # Listar todos los proveedores con relaciones completas
+extend type Query {
     listProveedor: [Proveedor]
-    
-    # Listar proveedores paginados con filtros
     listProveedoresPaginated(filter: ProveedorPaginationInput): ProveedorPaginatedResponse!
-    
-    # Obtener proveedor por ID con relaciones completas
     getProveedorById(id: ID!): Proveedor
-    
-    # Buscar proveedor por RUC
     getProveedorByRuc(ruc: String!): Proveedor
-    
-    # Obtener estadísticas de cotizaciones por proveedor
-    getEstadisticasCotizaciones(proveedorId: ID!): EstadisticasDetalladas
-    
-    # Listar proveedores con subcontratación habilitada
     listProveedoresSubContrata: [ProveedorBasico]
+    # Conservada por compatibilidad de contrato; devuelve null (sin cotizaciones).
+    getEstadisticasCotizaciones(proveedorId: ID!): EstadisticasDetalladas
 }
 
-# ============================================================================
-# MUTATIONS
-# ============================================================================
+extend type Mutation {
+    addProveedor(
+        razon_social: String!
+        ruc: String!
+        direccion: String
+        nombre_comercial: String
+        rubro: String
+        estado: String
+        tipo: String
+        actividad: String
+        correo: String
+        telefono: String
+        estado_sunat: String
+        condicion: String
+        agente_retencion: Boolean
+        sub_contrata: Boolean
+        distrito: String
+        provincia: String
+        departamento: String
+    ): Proveedor!
 
-type Mutation {
-    # Crear nuevo proveedor
-    addProveedor(input: ProveedorInput!): Proveedor!
+    updateProveedor(
+        id: ID!
+        razon_social: String
+        ruc: String
+        direccion: String
+        nombre_comercial: String
+        rubro: String
+        estado: String
+        tipo: String
+        actividad: String
+        correo: String
+        telefono: String
+        estado_sunat: String
+        condicion: String
+        agente_retencion: Boolean
+        sub_contrata: Boolean
+        distrito: String
+        provincia: String
+        departamento: String
+    ): Proveedor
 
-    # Actualizar proveedor existente
-    updateProveedor(id: ID!, input: ProveedorInput!): Proveedor
-
-    # Eliminar proveedor
     deleteProveedor(id: ID!): Proveedor
 }

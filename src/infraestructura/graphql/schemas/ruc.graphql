@@ -1,0 +1,29 @@
+# ============================================================================
+# CONSULTA DE RUC (SUNAT vía api perudevs) — mismo contrato que inacons.
+# Se ejecuta en el backend (key en servidor) y cachea en la colección "ruc".
+# ============================================================================
+
+type RucData {
+  razonSocial: String
+  nombreComercial: String
+  numeroDocumento: String
+  estado: String
+  condicion: String
+  direccion: String
+  distrito: String
+  provincia: String
+  departamento: String
+  tipo: String
+  actividadEconomica: String
+  EsAgenteRetencion: Boolean
+}
+
+type RucResponse {
+  success: Boolean
+  data: RucData
+  fromCache: Boolean
+}
+
+extend type Query {
+  consultarRuc(numeroDocumento: String!): RucResponse
+}

@@ -1,0 +1,28 @@
+# ============================================================================
+# SCHEMA DE COMENTARIO PROVEEDOR (bitácora / trazabilidad)
+# Polimórfico por (referencia_id + tabla).
+# ============================================================================
+
+type ComentarioProveedor {
+  id: ID!
+  referencia_id: ID!
+  tabla: String!
+  comentario: String!
+  usuario_id: ID
+  usuario_nombre: String
+  createdAt: String
+}
+
+extend type Query {
+  listComentariosProveedor(referencia_id: ID!, tabla: String): [ComentarioProveedor!]!
+}
+
+extend type Mutation {
+  addComentarioProveedor(
+    referencia_id: ID!
+    tabla: String!
+    comentario: String!
+    usuario_id: ID
+    usuario_nombre: String
+  ): ComentarioProveedor!
+}

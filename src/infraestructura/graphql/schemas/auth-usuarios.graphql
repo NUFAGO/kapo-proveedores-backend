@@ -91,32 +91,12 @@ type Cargo {
 # TIPOS DE EMPRESA
 # ============================================================================
 
-type Empresa {
-  id: ID!
-  nombre_comercial: String!
-  razon_social: String!
-  descripcion: String
-  estado: String
-  regimen_fiscal: String
-  ruc: String
-  imagenes: [String]
-  color: String
-}
+# NOTA: el tipo Empresa, su input y su API se migraron a empresa.graphql
+# (catálogo propio en Mongo con contrato de inacons). Se elimina el huérfano.
 
 type DeleteResponse {
   success: Boolean
   message: String
-}
-
-input EmpresaInput {
-  nombre_comercial: String!
-  razon_social: String!
-  descripcion: String
-  estado: String!
-  regimen_fiscal: String
-  ruc: String!
-  imagenes: [String]
-  color: String
 }
 
 # ============================================================================
@@ -133,14 +113,15 @@ extend type Query {
   getAllUsuarios: [Usuario]
   usuariosCargo: [Usuario]
   getUsuariosByRegistrosGeneralesContables: [Usuario]
-  
-  # Empresa
-  listEmpresas: [Empresa!]!
-  getEmpresaById(id: ID!): Empresa
-  listEmpresasPaginated(pagination: PaginationInput!): PaginatedResponse
-  listEmpresasWithFilters(filters: [FilterInput!]!, pagination: PaginationInput): PaginatedResponse
-  searchEmpresas(search: SearchInput!, pagination: PaginationInput): PaginatedResponse
-  countEmpresas(filters: [FilterInput!]): Int
+  """
+  Usuarios inacons por rol (regex en nombre) y/o jerarquía de cargo.
+  Paridad kapo-compras / inacons kanban proveedor.
+  """
+  getUsuariosByRolCargo(jerarquia: Int, rolRegex: String): [Usuario]
+  """Unión contabilidad (rol *conta*) + gerencia (jerarquía 4)."""
+  listarAprobadoresProveedorKanban: [Usuario!]!
+  """Si el admin logueado puede validar cuentas / aprobar estados de proveedor."""
+  puedeAprobarProveedorKanban: Boolean!
 }
 
 # ============================================================================
@@ -160,9 +141,4 @@ extend type Mutation {
   createUsuario(data: UsuarioInput): Usuario
   updateUsuario(id: ID!, data: UsuarioInput!): Usuario
   deleteUsuario(id: ID!): Usuario
-  
-  # Empresa
-  addEmpresa(data: EmpresaInput!): Empresa
-  updateEmpresa(id: ID!, data: EmpresaInput!): Empresa
-  deleteEmpresa(id: ID!): DeleteResponse
 }

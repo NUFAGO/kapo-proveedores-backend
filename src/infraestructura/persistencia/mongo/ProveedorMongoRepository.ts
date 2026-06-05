@@ -136,6 +136,20 @@ export class ProveedorMongoRepository implements IProveedorRepository {
     return docs[0] ? this.normalizeId(docs[0]) : null;
   }
 
+  async getProveedoresByIds(ids: string[]): Promise<Proveedor[]> {
+    const objectIds = (ids ?? [])
+      .map((id) => String(id ?? '').trim())
+      .filter((id) => id && Types.ObjectId.isValid(id))
+      .map((id) => new Types.ObjectId(id));
+    if (objectIds.length === 0) return [];
+
+    const docs = await ProveedorModel.aggregate([
+      { $match: { _id: { $in: objectIds } } },
+      ...this.buildRelacionesPipeline(),
+    ]);
+    return docs.map((d) => this.normalizeId(d));
+  }
+
   async getProveedorByRuc(ruc: string): Promise<Proveedor | null> {
     const rucNumber = Number(ruc);
     if (isNaN(rucNumber)) return null;

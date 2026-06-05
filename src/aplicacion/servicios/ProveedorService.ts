@@ -71,6 +71,12 @@ export class ProveedorService {
     return this.repository.getProveedorByRuc(ruc);
   }
 
+  /** Hidratación batch para consumidores externos (evita N+1 de getProveedorById). */
+  async obtenerProveedoresPorIds(ids: string[]): Promise<Proveedor[]> {
+    if (!Array.isArray(ids) || ids.length === 0) return [];
+    return this.repository.getProveedoresByIds(ids);
+  }
+
   async listarProveedoresSubContrata(): Promise<Proveedor[]> {
     return this.repository.listProveedoresSubContrata();
   }

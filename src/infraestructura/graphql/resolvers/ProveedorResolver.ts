@@ -31,6 +31,12 @@ export class ProveedorResolver {
             'getProveedorById',
             { id }
           ),
+        getProveedoresByIds: (_: unknown, { ids }: { ids: string[] }) =>
+          ErrorHandler.handleError(
+            () => this.proveedorService.obtenerProveedoresPorIds(ids),
+            'getProveedoresByIds',
+            { count: Array.isArray(ids) ? ids.length : 0 }
+          ),
         getProveedorByRuc: (_: unknown, { ruc }: { ruc: string }) =>
           ErrorHandler.handleError(
             () => this.proveedorService.buscarProveedorPorRuc(ruc),

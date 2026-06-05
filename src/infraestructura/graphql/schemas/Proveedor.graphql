@@ -102,6 +102,8 @@ extend type Query {
     listProveedor: [Proveedor]
     listProveedoresPaginated(filter: ProveedorPaginationInput): ProveedorPaginatedResponse!
     getProveedorById(id: ID!): Proveedor
+    # Hidratación batch para consumidores externos (kapo-compras) — evita N+1.
+    getProveedoresByIds(ids: [ID!]!): [Proveedor!]!
     getProveedorByRuc(ruc: String!): Proveedor
     listProveedoresSubContrata: [ProveedorBasico]
     # Conservada por compatibilidad de contrato; devuelve null (sin cotizaciones).

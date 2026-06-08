@@ -101,7 +101,13 @@ export const createServer = (resolvers: any, typeDefs: any): { app: Application;
   const apolloServer = new ApolloServer({
     schema: makeExecutableSchema({ typeDefs, resolvers }),
     introspection: true,
-    context: ({ req }) => ({ req, token: req.headers.authorization?.split(" ")[1] }),
+    context: ({ req }) => ({
+      req,
+      token: req.headers.authorization?.split(' ')[1],
+      serviceToken:
+        (typeof req.headers['x-service-token'] === 'string' ? req.headers['x-service-token'] : undefined)
+        ?? req.headers.authorization?.split(' ')[1],
+    }),
     plugins: [ApolloServerPluginLandingPageGraphQLPlayground()],
     persistedQueries: false,
     formatError: (error: any): any => {

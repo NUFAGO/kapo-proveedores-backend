@@ -4,14 +4,18 @@
 
 import { JWTUtils } from './JWTUtils';
 import { logger } from '../logging';
+import { ServiceIntegrationAuthRules } from '../../dominio/servicios/ServiceIntegrationAuthRules';
 
 export interface GraphQLContext {
   req?: {
     headers?: Record<string, string | string[] | undefined> & {
       authorization?: string;
+      'x-service-token'?: string;
     };
   };
   user?: any;
+  token?: string;
+  serviceToken?: string;
 }
 
 export interface GraphQLGuardOptions {
@@ -216,4 +220,29 @@ export const optionalAuthGuard = (
   return authGuard(resolver, {
     required: false
   });
+};
+
+function resolveServiceToken(context: GraphQLContext): string | undefined {
+  const headerToken = context.serviceToken?.trim()
+    || (typeof context.req?.headers?.['x-service-token'] === 'string'
+      ? context.req.headers['x-service-token'].trim()
+      : undefined);
+  if (headerToken) return headerToken;
+  const bearer = context.req?.headers?.authorization
+    ? JWTUtils.extractTokenFromHeader(context.req.headers.authorization)
+    : null;
+  return bearer?.trim() || undefined;
+}
+
+/**
+ * Guardia M2M — Pagos/Compras con `X-Service-Token` o Bearer service token.
+ * Si `PROVEEDORES_SERVICE_TOKEN` no está configurado, permite (dev local).
+ */
+export const serviceTokenGuard = (
+  resolver: GraphQLResolverFunction,
+): GraphQLResolverFunction => {
+  return async (parent: any, args: any, context: GraphQLContext, info: any): Promise<any> => {
+    ServiceIntegrationAuthRules.assertProveedoresServiceToken(resolveServiceToken(context));
+    return resolver(parent, args, context, info);
+  };
 };

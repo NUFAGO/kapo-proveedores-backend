@@ -66,6 +66,32 @@ export abstract class BaseHttpRepository<T> {
     return client.request(request);
   }
 
+  protected async graphqlRequestWithServiceToken(
+    query: string,
+    variables: Record<string, unknown> = {},
+    serviceToken?: string,
+    serviceName: string = '',
+    fallbackServiceName: string = 'inacons-backend',
+  ): Promise<any> {
+    const token = serviceToken?.trim();
+    const headers: Record<string, string> = {};
+    if (token) {
+      headers['X-Service-Token'] = token;
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+    const client = await this.getClient(serviceName, fallbackServiceName);
+    const request: { query: string; variables?: Record<string, unknown>; headers?: Record<string, string> } = {
+      query,
+    };
+    if (variables && Object.keys(variables).length > 0) {
+      request.variables = variables;
+    }
+    if (Object.keys(headers).length > 0) {
+      request.headers = headers;
+    }
+    return client.request(request);
+  }
+
   /**
    * Crea un resultado de paginación estándar
    */

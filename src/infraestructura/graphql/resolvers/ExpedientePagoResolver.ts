@@ -6,7 +6,7 @@ import { ExpedientePagoInput, ExpedientePagoFilter } from '../../../dominio/enti
 
 import { ErrorHandler } from './ErrorHandler';
 
-import { adminGuard } from '../../auth/GraphQLGuards';
+import { adminGuard, serviceTokenGuard } from '../../auth/GraphQLGuards';
 
 import { JWTUtils } from '../../auth/JWTUtils';
 
@@ -336,15 +336,15 @@ export class ExpedientePagoResolver {
         },
 
         /**
-         * Sin JWT ni cabecera de integración: mismo payload que obtenerExpedienteCompleto (incl. solicitudesPagoDetalle).
+         * Lectura M2M para Pagos BFF (requiere service token si PROVEEDORES_SERVICE_TOKEN está configurado).
          */
-        obtenerExpedienteCompletoLibrePorOcId: async (_: unknown, { ocId }: { ocId: string }) => {
+        obtenerExpedienteCompletoLibrePorOcId: serviceTokenGuard(async (_: unknown, { ocId }: { ocId: string }) => {
           return await ErrorHandler.handleError(async () => {
             const expediente = await this.servicio.obtenerExpedientePorOcId(ocId.trim());
             const base = await this.servicio.obtenerExpedienteCompleto(expediente.id);
             return await this.adjuntarSolicitudesPagoDetalle(expediente.id, base as Record<string, unknown>);
           }, 'obtenerExpedienteCompletoLibrePorOcId');
-        },
+        }),
 
         
 

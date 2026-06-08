@@ -8,7 +8,7 @@ import { IExpedientePagoRepository } from '../../../dominio/repositorios/IExpedi
 import { SolicitudPagoFilter } from '../../../dominio/entidades/SolicitudPago';
 import { ErrorHandler } from './ErrorHandler';
 import { mapDetalleChecklistRevisionGQL } from './AprobacionResolver';
-import { adminGuard, authGuard, proveedorGuard, type GraphQLContext } from '../../auth/GraphQLGuards';
+import { adminGuard, authGuard, proveedorGuard, serviceTokenGuard, type GraphQLContext } from '../../auth/GraphQLGuards';
 import { JWTUtils } from '../../auth/JWTUtils';
 
 // Tipos para los argumentos
@@ -148,7 +148,7 @@ export class SolicitudPagoResolver {
           );
         }),
 
-        solicitudPagoDetalleByOrdenPagoId: async (_: unknown, { ordenPagoId }: { ordenPagoId: string }) => {
+        solicitudPagoDetalleByOrdenPagoId: serviceTokenGuard(async (_: unknown, { ordenPagoId }: { ordenPagoId: string }) => {
           return await ErrorHandler.handleError(async () => {
             const { solicitud, revisionChecklist } =
               await this.checklistRevision.obtenerSolicitudPagoDetalleRevisionPorOrdenPagoVinculadoId(
@@ -161,7 +161,7 @@ export class SolicitudPagoResolver {
                 : null,
             };
           }, 'solicitudPagoDetalleByOrdenPagoId');
-        },
+        }),
       },
 
       Mutation: {
@@ -213,9 +213,8 @@ export class SolicitudPagoResolver {
           );
         }),
 
-        // CUIDADO: Sin guard de autenticación — expuesto para llamadas backend-to-backend (inacons).
-        // Si se expone al frontend, agregar adminGuard.
-        vincularSolicitudConOrdenPagoInacons: async (_: any, { input }: VincularSolicitudOrdenPagoInaconsArgs) => {
+        // M2M Pagos → Proveedores (service token) o admin JWT.
+        vincularSolicitudConOrdenPagoInacons: serviceTokenGuard(async (_: any, { input }: VincularSolicitudOrdenPagoInaconsArgs) => {
           return await ErrorHandler.handleError(
             async () =>
               await this.servicio.vincularConOrdenPagoInacons(
@@ -225,7 +224,7 @@ export class SolicitudPagoResolver {
               ),
             'vincularSolicitudConOrdenPagoInacons'
           );
-        },
+        }),
       }
     };
   }

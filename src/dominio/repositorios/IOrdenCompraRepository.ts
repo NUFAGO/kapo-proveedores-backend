@@ -39,4 +39,6 @@ export interface OrdenCompraPaginatedResponse {
 export interface IOrdenCompraRepository {
   listOrdenComprasPaginated(filter?: OrdenCompraFilter): Promise<OrdenCompraPaginatedResponse>;
   findById(id: string): Promise<any>;
+  /** Proveedores → Compras M2M (`actualizarTieneExpediente`). */
+  actualizarTieneExpediente(ordenCompraId: string, tieneExpediente: boolean): Promise<void>;
 }

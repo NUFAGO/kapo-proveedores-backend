@@ -293,7 +293,10 @@ export class ResolverFactory {
     container.register('UploadResolver', () => new UploadResolver(), true);
     
     // Registrar OrdenCompraService
-    container.register('OrdenCompraService', () => new OrdenCompraService(), true);
+    container.register('OrdenCompraService', (c: any) => {
+      const proveedorService = c.resolve('ProveedorService');
+      return new OrdenCompraService(undefined, proveedorService);
+    }, true);
     
     // ============================================================
     // Catálogos migrados desde inacons (Proveedor, Empresa, Banco)

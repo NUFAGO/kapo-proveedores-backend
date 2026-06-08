@@ -6,7 +6,8 @@ import { IDocumentoOCRepository } from '../repositorios/IDocumentoOCRepository';
 import { ICategoriaChecklistRepository } from '../repositorios/ICategoriaChecklistRepository';
 import { IPlantillaChecklistRepository } from '../repositorios/IPlantillaChecklistRepository';
 import { ISolicitudPagoRepository } from '../repositorios/ISolicitudPagoRepository';
-import { BaseHttpRepository } from '../../infraestructura/persistencia/http/BaseHttpRepository';
+import { HttpOrdenCompraRepository } from '../../infraestructura/persistencia/http/HttpOrdenCompraRepository';
+import { EntityNotFoundException } from '../exceptions/DomainException';
 import { logger } from '../../infraestructura/logging';
 import { redondearMontoSoles } from '../util/redondearMontoSoles';
 
@@ -17,23 +18,8 @@ function porcentajeTipoPagoOmitido(value: number | null | undefined): number | u
   return Math.min(100, value);
 }
 
-class MonolithHttpRepository extends BaseHttpRepository<any> {
-  async list(): Promise<any[]> {
-    return [];
-  }
-
-  protected getDefaultSearchFields(): string[] {
-    return [];
-  }
-
-  // Expose the protected graphqlRequest method for use in ExpedientePagoService
-  async callGraphQLRequest(query: string, variables: any = {}, serviceName: string = '', fallbackServiceName: string = 'inacons-backend'): Promise<any> {
-    return this.graphqlRequest(query, variables, serviceName, fallbackServiceName);
-  }
-}
-
 export class ExpedientePagoService {
-  private httpRepository: MonolithHttpRepository;
+  private readonly comprasOcRepo: HttpOrdenCompraRepository;
 
   constructor(
     private readonly expedienteRepository: IExpedientePagoRepository,
@@ -41,48 +27,29 @@ export class ExpedientePagoService {
     private readonly documentoOCRepository: IDocumentoOCRepository,
     private readonly categoriaRepository: ICategoriaChecklistRepository,
     private readonly plantillaRepository: IPlantillaChecklistRepository,
-    private readonly solicitudPagoRepository: ISolicitudPagoRepository
+    private readonly solicitudPagoRepository: ISolicitudPagoRepository,
+    comprasOcRepo?: HttpOrdenCompraRepository,
   ) {
-    this.httpRepository = new MonolithHttpRepository();
+    this.comprasOcRepo = comprasOcRepo ?? new HttpOrdenCompraRepository();
   }
 
   /**
-   * Actualizar el estado de tiene_expediente en el monolito
+   * Actualizar tiene_expediente en Kapo-Compras (source of truth OC).
    */
-  private async actualizarEstadoExpedienteEnMonolito(ocId: string, tieneExpediente: boolean): Promise<void> {
+  private async actualizarTieneExpedienteEnCompras(ocId: string, tieneExpediente: boolean): Promise<void> {
     try {
-      logger.info(`Actualizando estado de expediente en monolito para OC ${ocId} a ${tieneExpediente}`);
-      
-      const mutation = `
-        mutation ActualizarEstadoExpediente($ordenCompraId: ID!, $tieneExpediente: Boolean!) {
-          actualizarEstadoExpediente(ordenCompraId: $ordenCompraId, tieneExpediente: $tieneExpediente) {
-            success
-            message
-          }
-        }
-      `;
-
-      const result = await this.httpRepository.callGraphQLRequest(
-        mutation,
-        { ordenCompraId: ocId, tieneExpediente },
-        'inacons-backend'
-      );
-
-      if (result?.actualizarEstadoExpediente?.success) {
-        logger.info(`Estado de expediente actualizado exitosamente en monolito para OC ${ocId}`);
-      } else {
-        throw new Error('No se pudo actualizar el estado de expediente en el monolito');
-      }
+      logger.info(`Actualizando tiene_expediente en Compras para OC ${ocId} → ${tieneExpediente}`);
+      await this.comprasOcRepo.actualizarTieneExpediente(ocId, tieneExpediente);
+      logger.info(`tiene_expediente actualizado en Compras para OC ${ocId}`);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      
-      // MODO ESTRICTO: CUALQUIER error del monolito causa rollback
-      if (errorMessage.includes('Cannot query field') || errorMessage.includes('actualizarEstadoExpediente')) {
-        throw new Error(`La mutación actualizarEstadoExpediente no está disponible en el monolito. El monolito necesita reiniciarse para poder crear expedientes.`);
-      }
-      
-      throw new Error(`Error crítico al actualizar estado de expediente en monolito: ${errorMessage}`);
+      throw new Error(`Error crítico al actualizar tiene_expediente en Compras: ${errorMessage}`);
     }
+  }
+
+  /** @deprecated Reemplazado por actualizarTieneExpedienteEnCompras (F2 cutover). */
+  private async actualizarEstadoExpedienteEnMonolito(ocId: string, tieneExpediente: boolean): Promise<void> {
+    return this.actualizarTieneExpedienteEnCompras(ocId, tieneExpediente);
   }
 
   /**
@@ -130,17 +97,17 @@ export class ExpedientePagoService {
       // 1. Crear el expediente
       nuevoExpediente = await this.expedienteRepository.create(expediente);
 
-      // 2. Actualizar el estado de tiene_expediente en el monolito
+      // 2. Propagar tiene_expediente a Kapo-Compras (outbox → oc_para_pagos)
       await this.actualizarEstadoExpedienteEnMonolito(input.ocId, true);
 
       // 3. Si todo fue exitoso, retornar el expediente
       return nuevoExpediente;
     } catch (error) {
-      // 4. Si falló la actualización en el monolito, hacer rollback: eliminar el expediente creado
+      // 4. Si falló la propagación a Compras, rollback: eliminar el expediente creado
       if (nuevoExpediente && nuevoExpediente.id) {
         try {
           await this.expedienteRepository.delete(nuevoExpediente.id);
-          logger.warn(`Rollback: Expediente ${nuevoExpediente.id} eliminado debido a fallo en monolito`);
+          logger.warn(`Rollback: Expediente ${nuevoExpediente.id} eliminado debido a fallo en Compras`);
         } catch (rollbackError) {
           const rollbackErrorMessage = rollbackError instanceof Error ? rollbackError.message : String(rollbackError);
           logger.error(`Error crítico: No se pudo hacer rollback del expediente ${nuevoExpediente.id}:`, { error: rollbackErrorMessage });
@@ -391,7 +358,7 @@ export class ExpedientePagoService {
 
     const resultado = await this.expedienteRepository.delete(id);
     
-    // Si se eliminó exitosamente, actualizar el estado en el monolito
+    // Si se eliminó exitosamente, propagar tiene_expediente=false a Compras
     if (resultado) {
       await this.actualizarEstadoExpedienteEnMonolito(expediente.ocId, false);
     }
@@ -538,7 +505,7 @@ export class ExpedientePagoService {
       // 5. Actualizar estado del expediente a configurado
       const expedienteActualizado = await this.actualizarEstado(expediente.id, 'configurado');
       
-      // 6. Actualizar el estado de tiene_expediente en el monolito
+      // 6. Propagar tiene_expediente=true a Kapo-Compras
       await this.actualizarEstadoExpedienteEnMonolito(ocData.id, true);
       
       return expedienteActualizado;
@@ -871,7 +838,11 @@ export class ExpedientePagoService {
   async obtenerExpedientePorOcId(ocId: string): Promise<ExpedientePago> {
     const expediente = await this.expedienteRepository.findByOcId(ocId);
     if (!expediente) {
-      throw new Error('No se encontró un expediente para la OC especificada');
+      throw new EntityNotFoundException(
+        'No se encontró un expediente para la OC especificada',
+        'expediente_pago',
+        ocId,
+      );
     }
     return expediente;
   }

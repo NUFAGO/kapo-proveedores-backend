@@ -62,6 +62,8 @@ export class SimpleServiceRegistry implements ServiceRegistry {
       this.services.set('inacons-backend', urls.inaconsBackendUrl);
       this.services.set('personal-backend', urls.personalBackendUrl);
       this.services.set('tareo-backend', urls.tareoBackendUrl);
+      // Auth central (kapo-autentificacion): identidad/usuarios admin.
+      this.services.set('auth-service', this.configService.getAuthBackendUrl());
       
       logger.info('ServiceRegistry inicializado desde configuración', {
         servicesCount: this.services.size

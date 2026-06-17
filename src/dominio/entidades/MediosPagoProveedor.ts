@@ -51,3 +51,34 @@ export interface MediosPagoProveedorPaginatedResponse {
   limit: number;
   totalPages: number;
 }
+
+/** Medio de pago en listado agrupado caja chica (paridad inacons `MedioPagoLitleBox`). */
+export interface MedioPagoLitleBox {
+  id: string;
+  nro_cuenta?: string | null;
+  entidad?: Banco | null;
+  detalles?: string | null;
+  titular?: string | null;
+  validado?: boolean | null;
+  mostrar?: boolean | null;
+}
+
+/** Proveedor resumido en listado caja chica (paridad inacons `ProveedorLitleBox`). */
+export interface ProveedorLitleBox {
+  id: string;
+  razon_social: string;
+  nombre_comercial?: string | null;
+  tipo: string;
+  ruc: string;
+  direccion?: string | null;
+  rubro?: string | null;
+  estado?: string | null;
+  actividad?: string | null;
+  correo?: string | null;
+  horario?: string | null;
+}
+
+export interface MediosPagoProveedorLitleBoxGroup {
+  proveedor_id: ProveedorLitleBox;
+  medios_pago: MedioPagoLitleBox[];
+}

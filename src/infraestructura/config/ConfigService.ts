@@ -45,7 +45,13 @@ export class ConfigService {
       'GOOGLE_CLOUD_CREDENTIALS_JSON',
       'INACONS_BACKEND_URL',
       'PERSONAL_BACKEND_URL',
-      'CORS_ORIGINS'
+      'CORS_ORIGINS',
+      // --- Autenticación centralizada (kapo-autentificacion) ---
+      'SISTEMA_CODIGO',
+      'AUTH_BACKEND_URL',
+      // --- Gateway (plan unificación) ---
+      'INTERNAL_GATEWAY_SECRET',
+      'REQUIRE_GATEWAY_SECRET'
     ];
 
     envVars.forEach(envVar => {
@@ -118,6 +124,33 @@ export class ConfigService {
    */
   getServerPort(): number {
     return this.getNumber('PORT', 8080);
+  }
+
+  // ==========================================================================
+  // Autenticación centralizada (kapo-autentificacion) + gateway
+  // ==========================================================================
+
+  /** Código de este sistema en auth (claim `sistema` del token admin). */
+  getSistemaCodigo(): string {
+    return this.getOrDefault('SISTEMA_CODIGO', 'proveedores');
+  }
+
+  /** GraphQL de auth (identidad/usuarios admin). */
+  getAuthBackendUrl(): string {
+    return this.getOrDefault('AUTH_BACKEND_URL', 'http://localhost:8079/graphql');
+  }
+
+  /** Secreto compartido con el gateway (header X-Gateway-Secret). */
+  getInternalGatewaySecret(): string {
+    return this.getOrDefault('INTERNAL_GATEWAY_SECRET', '');
+  }
+
+  /**
+   * Si true, /graphql solo acepta peticiones con X-Gateway-Secret válido (o
+   * token proveedor local). false en dev; true en producción.
+   */
+  requireGatewaySecret(): boolean {
+    return this.getBoolean('REQUIRE_GATEWAY_SECRET', false);
   }
 
   /**

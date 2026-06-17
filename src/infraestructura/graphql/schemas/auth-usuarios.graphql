@@ -28,13 +28,7 @@ type Permission {
   eliminar: Boolean!
 }
 
-type LoginResponse {
-  id: ID
-  token: String
-  usuario: String
-  nombresA: String
-  role: Role
-}
+# LoginResponse / login ELIMINADOS — identidad admin vía kapo-autentificacion (gateway).
 
 input MenuPermissionInput {
   menuID: ID!
@@ -129,9 +123,6 @@ extend type Query {
 # ============================================================================
 
 extend type Mutation {
-  # Auth
-  login(usuario: String, contrasenna: String): LoginResponse
-  
   # Roles
   addRole(nombre: String!, descripcion: String!, menusPermissions: [MenuPermissionInput!]!): Role!
   updateRole(id: ID!, nombre: String!, descripcion: String!, menusPermissions: [MenuPermissionInput!]!): Role!

@@ -2,6 +2,7 @@ import express, { Application } from 'express';
 import { ApolloServer } from 'apollo-server-express';
 import { ApolloServerPluginLandingPageGraphQLPlayground } from 'apollo-server-core';
 import { makeExecutableSchema } from '@graphql-tools/schema';
+import { applyMiddleware } from 'graphql-middleware';
 import cors from 'cors';
 import http from 'http';
 import { logger } from '../logging';
@@ -9,6 +10,10 @@ import { HealthCheckService } from '../health/HealthCheckService';
 import { DatabaseHealthCheck } from '../health/DatabaseHealthCheck';
 
 import { ConfigService } from './ConfigService';
+import { buildPermissions } from '../graphql/auth/permissions';
+import { decodificarClaims } from '../auth/tokenContext';
+import { createGatewayValidationMiddleware } from '../auth/gatewayValidationMiddleware';
+import { JWTUtils } from '../auth/JWTUtils';
 
 const configService = ConfigService.getInstance();
 
@@ -98,10 +103,55 @@ export const createServer = (resolvers: any, typeDefs: any): { app: Application;
   httpServer.keepAliveTimeout = 120000;
   httpServer.headersTimeout = 125000;
 
+  // Bloqueo de acceso directo: solo gateway (X-Gateway-Secret) o proveedor
+  // local válido cuando REQUIRE_GATEWAY_SECRET=true. Montado antes de Apollo.
+  app.use('/graphql', createGatewayValidationMiddleware(configService));
+
+  // shield: autoriza por operación (admin IAM+sistema O proveedor local).
+  const baseSchema = makeExecutableSchema({ typeDefs, resolvers });
+  const schema = applyMiddleware(baseSchema, buildPermissions(configService));
+
   const apolloServer = new ApolloServer({
-    schema: makeExecutableSchema({ typeDefs, resolvers }),
+    schema,
     introspection: true,
-    context: ({ req }) => ({ req, token: req.headers.authorization?.split(" ")[1] }),
+    context: async ({ req }) => {
+      const bearer = req.headers.authorization?.replace(/^Bearer\s+/i, '').trim();
+
+      // Discrimina por tipo de token:
+      //  · IAM (RS256, tiene sid) → ADMIN. El gateway ya validó la firma; aquí
+      //    solo se DECODIFICAN los claims.
+      //  · local (HS256) → PROVEEDOR externo (no está en el IAM): se valida LOCAL.
+      let usuarioAuth: ReturnType<typeof decodificarClaims> = null;
+      let user:
+        | { id?: string; tipo_usuario?: 'admin' | 'proveedor'; proveedor_id?: string | null; role?: string }
+        | null = null;
+      let authMotivo: string | undefined;
+
+      if (bearer) {
+        const claims = decodificarClaims(bearer);
+        if (claims?.sid) {
+          usuarioAuth = claims;
+          user = {
+            id: claims.sub,
+            tipo_usuario: 'admin',
+            proveedor_id: null,
+            ...(claims.rol ? { role: claims.rol } : {}),
+          };
+        } else {
+          try {
+            const local = JWTUtils.validateToken(bearer);
+            if (local) user = local;
+          } catch (e) {
+            authMotivo =
+              e instanceof Error && e.message.includes('expirado')
+                ? 'TOKEN_EXPIRADO'
+                : 'TOKEN_INVALIDO';
+          }
+        }
+      }
+
+      return { req, token: bearer, usuarioAuth, user, authMotivo };
+    },
     plugins: [ApolloServerPluginLandingPageGraphQLPlayground()],
     persistedQueries: false,
     formatError: (error: any): any => {

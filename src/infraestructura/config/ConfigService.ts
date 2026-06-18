@@ -51,7 +51,11 @@ export class ConfigService {
       'AUTH_BACKEND_URL',
       // --- Gateway (plan unificación) ---
       'INTERNAL_GATEWAY_SECRET',
-      'REQUIRE_GATEWAY_SECRET'
+      'REQUIRE_GATEWAY_SECRET',
+      'INTERNAL_UPSTREAM_SECRET', // confianza M2M este-oeste (gateway interno → este MS, rol TARGET)
+      // --- Gateway INTERNO (este-oeste / M2M) — rol CALLER: consumir data de otros MS ---
+      'INTERNAL_GATEWAY_URL',     // base del kapo-gateway-internal
+      'INTERNAL_SERVICE_TOKEN',   // pase JWT de servicio (sub=service:proveedores)
     ];
 
     envVars.forEach(envVar => {
@@ -143,6 +147,28 @@ export class ConfigService {
   /** Secreto compartido con el gateway (header X-Gateway-Secret). */
   getInternalGatewaySecret(): string {
     return this.getOrDefault('INTERNAL_GATEWAY_SECRET', '');
+  }
+
+  /**
+   * Secreto que el GATEWAY INTERNO inyecta como X-Internal-Gateway-Secret.
+   * Si llega y coincide (sin usuario) → llamada M2M este-oeste confiable.
+   */
+  getInternalUpstreamSecret(): string {
+    return this.getOrDefault('INTERNAL_UPSTREAM_SECRET', '');
+  }
+
+  // ==========================================================================
+  // Gateway INTERNO (este-oeste / M2M) — rol CALLER: consumir data de otros MS
+  // ==========================================================================
+
+  /** Base del gateway interno (ej. http://localhost:8091). */
+  getInternalGatewayUrl(): string {
+    return this.getOrDefault('INTERNAL_GATEWAY_URL', 'http://localhost:8091');
+  }
+
+  /** Pase JWT de servicio (firmado por auth) para pasar el gateway interno. */
+  getInternalServiceToken(): string {
+    return this.getOrDefault('INTERNAL_SERVICE_TOKEN', '');
   }
 
   /**

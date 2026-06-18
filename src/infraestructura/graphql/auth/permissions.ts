@@ -24,6 +24,8 @@ export interface ProveedoresAuthContext {
   user?: { id?: string; tipo_usuario?: 'admin' | 'proveedor'; proveedor_id?: string | null } | null;
   /** Motivo cuando NO hay auth válido: TOKEN_EXPIRADO | TOKEN_INVALIDO | undefined */
   authMotivo?: string;
+  /** true cuando la request llega del gateway INTERNO (X-Internal-Gateway-Secret válido, sin usuario) → llamada M2M confiable este-oeste. */
+  internalTrusted?: boolean;
 }
 
 function errorNoAutenticado(ctx: ProveedoresAuthContext): GraphQLError {
@@ -40,6 +42,9 @@ function errorNoAutenticado(ctx: ProveedoresAuthContext): GraphQLError {
 /** Autenticado: admin del IAM (sistema correcto) O proveedor local válido. */
 const isAuthenticated = (sistemaCodigo: string) =>
   rule({ cache: 'contextual' })(async (_p, _a, ctx: ProveedoresAuthContext) => {
+    // Llamada M2M este-oeste (otro MS vía gateway interno): confiable por el
+    // secreto de upstream. Sin usuario; se permite el consumo interno.
+    if (ctx.internalTrusted) return true;
     const u = ctx.usuarioAuth;
     if (u?.sid) {
       if (u.sistema && u.sistema !== sistemaCodigo) {

@@ -1,7 +1,19 @@
 import { GraphQLClient } from '../../http/GraphQLClient';
 import { SimpleServiceRegistry } from '../../discovery/ServiceRegistry';
+import { ConfigService } from '../../config/ConfigService';
 import { PaginationInput, PaginationResult, FilterInput, SearchInput } from '../../../dominio/valueObjects/Pagination';
 import { logger } from '../../logging';
+
+/**
+ * Mapa de servicios consumidos VÍA gateway interno (este-oeste): nombre en el
+ * ServiceRegistry → path lógico del gateway interno. Se enruta por el internal
+ * si hay token de servicio (no hay fallback a directo: los targets están
+ * protegidos y solo confían en el gateway). Agregar un destino = 1 línea aquí.
+ */
+const INTERNAL_GATEWAY_PATHS: Record<string, string> = {
+  'requerimientos-backend': '/requerimientos/graphql',
+  'presupuestos-backend': '/presupuesto/graphql',
+};
 
 /**
  * Repositorio base HTTP que implementa la lógica común de inicialización del cliente GraphQL
@@ -57,13 +69,41 @@ export abstract class BaseHttpRepository<T> {
     serviceName: string = '',
     fallbackServiceName: string = 'inacons-backend'
   ): Promise<any> {
-    const client = await this.getClient(serviceName, fallbackServiceName);
     // Solo incluir variables si están definidas y no están vacías
     const request: any = { query };
     if (variables && Object.keys(variables).length > 0) {
       request.variables = variables;
     }
+
+    // Ruta M2M este-oeste: si el destino está mapeado y el gateway interno está
+    // activo, se enruta por él con el pase JWT de servicio (no por URL directa).
+    const internal = BaseHttpRepository.resolveInternalRoute(serviceName);
+    if (internal) {
+      const internalClient = new GraphQLClient(internal.url, {
+        headers: { Authorization: `Bearer ${internal.token}` },
+      });
+      return internalClient.request(request);
+    }
+
+    const client = await this.getClient(serviceName, fallbackServiceName);
     return client.request(request);
+  }
+
+  /**
+   * Si el servicio destino se consume vía gateway interno y está activo, devuelve
+   * la URL del internal (base + path lógico) y el pase de servicio. Si no, null
+   * (se usa la ruta directa de siempre).
+   */
+  private static resolveInternalRoute(
+    serviceName: string,
+  ): { url: string; token: string } | null {
+    const path = INTERNAL_GATEWAY_PATHS[serviceName];
+    if (!path) return null;
+    const config = ConfigService.getInstance();
+    const token = config.getInternalServiceToken();
+    if (!token) return null;
+    const base = config.getInternalGatewayUrl().replace(/\/+$/, '');
+    return { url: `${base}${path}`, token };
   }
 
   /**

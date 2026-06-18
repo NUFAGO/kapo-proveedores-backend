@@ -127,8 +127,32 @@ export const createServer = (resolvers: any, typeDefs: any): { app: Application;
         | null = null;
       let authMotivo: string | undefined;
 
-      if (bearer) {
-        const claims = decodificarClaims(bearer);
+      // Llamada M2M este-oeste: el gateway interno inyecta X-Internal-Gateway-Secret.
+      // Si coincide → consumo interno confiable. En ese caso el `Authorization` es
+      // el JWT de SERVICIO (RS256) que reenvía el internal, NO un token de usuario;
+      // por eso NO se intenta validar como admin/proveedor (evita el WARN
+      // "invalid algorithm" y trabajo inútil).
+      const upstreamSecret = configService.getInternalUpstreamSecret();
+      const recibido = req.headers['x-internal-gateway-secret'];
+      const internalTrusted =
+        !!upstreamSecret &&
+        typeof recibido === 'string' &&
+        recibido === upstreamSecret;
+
+      // Usuario: interna → viene en x-user-token (reenviado por el gateway);
+      // edge → en Authorization. Se DECODIFICA, no se re-valida (ya se validó
+      // en el edge).
+      const xUserTokenHeader = req.headers['x-user-token'];
+      const userTokenRaw = internalTrusted
+        ? (typeof xUserTokenHeader === 'string' ? xUserTokenHeader.replace(/^Bearer\s+/i, '').trim() : undefined)
+        : bearer;
+
+      // Discrimina por tipo de token:
+      //  · IAM (RS256, tiene sid) → ADMIN. El gateway ya validó la firma; aquí
+      //    solo se DECODIFICAN los claims.
+      //  · local (HS256) → PROVEEDOR externo (no está en el IAM): se valida LOCAL.
+      if (userTokenRaw) {
+        const claims = decodificarClaims(userTokenRaw);
         if (claims?.sid) {
           usuarioAuth = claims;
           user = {
@@ -139,7 +163,7 @@ export const createServer = (resolvers: any, typeDefs: any): { app: Application;
           };
         } else {
           try {
-            const local = JWTUtils.validateToken(bearer);
+            const local = JWTUtils.validateToken(userTokenRaw);
             if (local) user = local;
           } catch (e) {
             authMotivo =
@@ -150,7 +174,7 @@ export const createServer = (resolvers: any, typeDefs: any): { app: Application;
         }
       }
 
-      return { req, token: bearer, usuarioAuth, user, authMotivo };
+      return { req, token: bearer, usuarioAuth, user, authMotivo, internalTrusted };
     },
     plugins: [ApolloServerPluginLandingPageGraphQLPlayground()],
     persistedQueries: false,

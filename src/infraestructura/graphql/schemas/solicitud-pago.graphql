@@ -116,4 +116,7 @@ extend type Mutation {
 
   """Vincula la solicitud aprobada con una OP de Inacons (solo admin / token de servicio)."""
   vincularSolicitudConOrdenPagoInacons(input: VincularSolicitudOrdenPagoInaconsInput!): SolicitudPago!
+
+  """Quita el vínculo solicitud ↔ OP (solo admin / token de servicio)."""
+  desvincularSolicitudConOrdenPagoInacons(input: VincularSolicitudOrdenPagoInaconsInput!): SolicitudPago!
 }

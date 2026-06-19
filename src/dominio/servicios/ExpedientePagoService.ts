@@ -832,11 +832,16 @@ export class ExpedientePagoService {
     return expedienteRefrescado;
   }
 
+  /** Busca expediente por OC sin lanzar si no existe (uso M2M / BFF). */
+  async buscarExpedientePorOcId(ocId: string): Promise<ExpedientePago | null> {
+    return this.expedienteRepository.findByOcId(ocId);
+  }
+
   /**
    * Obtener expediente por OC ID
    */
   async obtenerExpedientePorOcId(ocId: string): Promise<ExpedientePago> {
-    const expediente = await this.expedienteRepository.findByOcId(ocId);
+    const expediente = await this.buscarExpedientePorOcId(ocId);
     if (!expediente) {
       throw new EntityNotFoundException(
         'No se encontró un expediente para la OC especificada',

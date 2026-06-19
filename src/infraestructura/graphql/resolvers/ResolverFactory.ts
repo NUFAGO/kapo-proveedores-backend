@@ -20,7 +20,6 @@ import { DocumentoSubidoResolver } from './DocumentoSubidoResolver';
 import { ProveedorResolver } from './ProveedorResolver';
 import { BancoResolver } from './BancoResolver';
 import { EmpresaResolver } from './EmpresaResolver';
-import { MediosPagoEmpresaResolver } from './MediosPagoEmpresaResolver';
 import { ContactoProveedorResolver } from './ContactoProveedorResolver';
 import { MediosPagoProveedorResolver } from './MediosPagoProveedorResolver';
 import { RucResolver } from './RucResolver';
@@ -49,13 +48,11 @@ import { DocumentoOCService } from '../../../dominio/servicios/DocumentoOCServic
 import { ProveedorService } from '../../../aplicacion/servicios/ProveedorService';
 import { BancoService } from '../../../aplicacion/servicios/BancoService';
 import { EmpresaService } from '../../../aplicacion/servicios/EmpresaService';
-import { MediosPagoEmpresaService } from '../../../aplicacion/servicios/MediosPagoEmpresaService';
 import { ContactoProveedorService } from '../../../aplicacion/servicios/ContactoProveedorService';
 import { MediosPagoProveedorService } from '../../../aplicacion/servicios/MediosPagoProveedorService';
 import { ProveedorMongoRepository } from '../../persistencia/mongo/ProveedorMongoRepository';
 import { BancoMongoRepository } from '../../persistencia/mongo/BancoMongoRepository';
 import { EmpresaMongoRepository } from '../../persistencia/mongo/EmpresaMongoRepository';
-import { MediosPagoEmpresaMongoRepository } from '../../persistencia/mongo/MediosPagoEmpresaMongoRepository';
 import { ContactoProveedorMongoRepository } from '../../persistencia/mongo/ContactoProveedorMongoRepository';
 import { MediosPagoProveedorMongoRepository } from '../../persistencia/mongo/MediosPagoProveedorMongoRepository';
 import { RucService } from '../../../aplicacion/servicios/RucService';
@@ -305,7 +302,6 @@ export class ResolverFactory {
     container.register('ProveedorMongoRepository', () => new ProveedorMongoRepository(), true);
     container.register('BancoMongoRepository', () => new BancoMongoRepository(), true);
     container.register('EmpresaMongoRepository', () => new EmpresaMongoRepository(), true);
-    container.register('MediosPagoEmpresaMongoRepository', () => new MediosPagoEmpresaMongoRepository(), true);
     container.register('ContactoProveedorMongoRepository', () => new ContactoProveedorMongoRepository(), true);
     container.register('MediosPagoProveedorMongoRepository', () => new MediosPagoProveedorMongoRepository(), true);
 
@@ -318,8 +314,6 @@ export class ResolverFactory {
       new BancoService(c.resolve('BancoMongoRepository')), true);
     container.register('EmpresaService', (c: any) =>
       new EmpresaService(c.resolve('EmpresaMongoRepository')), true);
-    container.register('MediosPagoEmpresaService', (c: any) =>
-      new MediosPagoEmpresaService(c.resolve('MediosPagoEmpresaMongoRepository')), true);
     container.register('ContactoProveedorService', (c: any) =>
       new ContactoProveedorService(c.resolve('ContactoProveedorMongoRepository')), true);
     container.register('MediosPagoProveedorService', (c: any) =>
@@ -365,8 +359,6 @@ export class ResolverFactory {
       new BancoResolver(c.resolve('BancoService')), true);
     container.register('EmpresaResolver', (c: any) =>
       new EmpresaResolver(c.resolve('EmpresaService')), true);
-    container.register('MediosPagoEmpresaResolver', (c: any) =>
-      new MediosPagoEmpresaResolver(c.resolve('MediosPagoEmpresaService')), true);
     container.register('ContactoProveedorResolver', (c: any) =>
       new ContactoProveedorResolver(c.resolve('ContactoProveedorService')), true);
     container.register('MediosPagoProveedorResolver', (c: any) =>
@@ -594,10 +586,6 @@ export class ResolverFactory {
       const empresaResolver = container.resolve<EmpresaResolver>('EmpresaResolver');
       resolvers.push(empresaResolver.getResolvers());
       logger.debug('Resolver configurado: empresa');
-
-      const mediosPagoEmpresaResolver = container.resolve<MediosPagoEmpresaResolver>('MediosPagoEmpresaResolver');
-      resolvers.push(mediosPagoEmpresaResolver.getResolvers());
-      logger.debug('Resolver configurado: mediosPagoEmpresa');
 
       const contactoProveedorResolver = container.resolve<ContactoProveedorResolver>('ContactoProveedorResolver');
       resolvers.push(contactoProveedorResolver.getResolvers());

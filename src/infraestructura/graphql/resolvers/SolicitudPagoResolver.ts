@@ -225,6 +225,18 @@ export class SolicitudPagoResolver {
             'vincularSolicitudConOrdenPagoInacons'
           );
         }),
+
+        desvincularSolicitudConOrdenPagoInacons: serviceTokenGuard(async (_: any, { input }: VincularSolicitudOrdenPagoInaconsArgs) => {
+          return await ErrorHandler.handleError(
+            async () =>
+              await this.servicio.desvincularConOrdenPagoInacons(
+                input.solicitudPagoId,
+                input.ordenPagoInaconsId,
+                input.ordenCompraInaconsId
+              ),
+            'desvincularSolicitudConOrdenPagoInacons'
+          );
+        }),
       }
     };
   }

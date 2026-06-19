@@ -275,8 +275,9 @@ extend type Query {
   """
   Igual que `obtenerExpedienteCompleto` (mismo tipo, incluye `solicitudesPagoDetalle`), resuelto por `ocId` de la OC en Inacons.
   Consulta sin autenticación (uso previsto: red interna / proxy del monolito).
+  Devuelve null si la OC no tiene expediente en Proveedores.
   """
-  obtenerExpedienteCompletoLibrePorOcId(ocId: String!): ExpedientePagoCompleto!
+  obtenerExpedienteCompletoLibrePorOcId(ocId: String!): ExpedientePagoCompleto
 
   
 

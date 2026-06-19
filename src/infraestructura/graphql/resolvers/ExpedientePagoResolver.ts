@@ -340,7 +340,8 @@ export class ExpedientePagoResolver {
          */
         obtenerExpedienteCompletoLibrePorOcId: serviceTokenGuard(async (_: unknown, { ocId }: { ocId: string }) => {
           return await ErrorHandler.handleError(async () => {
-            const expediente = await this.servicio.obtenerExpedientePorOcId(ocId.trim());
+            const expediente = await this.servicio.buscarExpedientePorOcId(ocId.trim());
+            if (!expediente) return null;
             const base = await this.servicio.obtenerExpedienteCompleto(expediente.id);
             return await this.adjuntarSolicitudesPagoDetalle(expediente.id, base as Record<string, unknown>);
           }, 'obtenerExpedienteCompletoLibrePorOcId');

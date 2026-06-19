@@ -3,11 +3,195 @@ import {
   PlantillaChecklist,
   PlantillaChecklistInput,
   PlantillaChecklistFiltros,
-  PlantillaChecklistConnection
+  PlantillaChecklistConnection,
+  RequisitoDocumento,
 } from '../../../dominio/entidades/PlantillaChecklist';
 import { IPlantillaChecklistRepository } from '../../../dominio/repositorios/IPlantillaChecklistRepository';
 import { PlantillaChecklistModel } from './schemas/PlantillaChecklistSchema';
 import { Types } from 'mongoose';
+
+function idsMatch(a: unknown, b: unknown): boolean {
+  if (a == null || b == null) return false;
+  return String(a).trim() === String(b).trim();
+}
+
+function findPlantillaDocumento(
+  plantillas: Array<{ _id: unknown }> | undefined,
+  plantillaDocumentoId: unknown,
+) {
+  if (!plantillas?.length || plantillaDocumentoId == null) return null;
+  return plantillas.find((pd) => idsMatch(pd._id, plantillaDocumentoId)) ?? null;
+}
+
+function findFormulario(
+  formularios: Array<{ _id: unknown; nombre?: string }> | undefined,
+  formularioId: unknown,
+) {
+  if (!formularios?.length || formularioId == null) return null;
+  return formularios.find((f) => idsMatch(f._id, formularioId)) ?? null;
+}
+
+function parseTipoRequisito(value: unknown): 'documento' | 'formulario' {
+  const v = String(value ?? 'documento').trim().toLowerCase();
+  return v === 'formulario' ? 'formulario' : 'documento';
+}
+
+function asOptionalId(value: unknown): string | undefined {
+  if (value == null || value === '') return undefined;
+  return String(value).trim();
+}
+
+/** Stages compartidos: requisitos + plantillas + formularios + categoría unwind previo. */
+function requisitosLookupStages(): Record<string, unknown>[] {
+  return [
+    {
+      $lookup: {
+        from: 'requisitos_documento',
+        localField: 'checklistIdString',
+        foreignField: 'checklistId',
+        as: 'requisitos',
+      },
+    },
+    {
+      $lookup: {
+        from: 'plantilladocumentos',
+        let: { requisitosIds: '$requisitos' },
+        pipeline: [
+          {
+            $match: {
+              $expr: {
+                $in: [
+                  '$_id',
+                  {
+                    $map: {
+                      input: {
+                        $filter: {
+                          input: '$$requisitosIds',
+                          as: 'req',
+                          cond: {
+                            $and: [
+                              { $ne: ['$$req.plantillaDocumentoId', null] },
+                              { $ne: ['$$req.plantillaDocumentoId', ''] },
+                            ],
+                          },
+                        },
+                      },
+                      as: 'req',
+                      in: { $toObjectId: '$$req.plantillaDocumentoId' },
+                    },
+                  },
+                ],
+              },
+            },
+          },
+        ],
+        as: 'plantillasDocumento',
+      },
+    },
+    {
+      $lookup: {
+        from: 'plantillaformularios',
+        let: { requisitosIds: '$requisitos' },
+        pipeline: [
+          {
+            $match: {
+              $expr: {
+                $in: [
+                  '$_id',
+                  {
+                    $map: {
+                      input: {
+                        $filter: {
+                          input: '$$requisitosIds',
+                          as: 'req',
+                          cond: {
+                            $and: [
+                              { $ne: ['$$req.formularioId', null] },
+                              { $ne: ['$$req.formularioId', ''] },
+                            ],
+                          },
+                        },
+                      },
+                      as: 'req',
+                      in: { $toObjectId: '$$req.formularioId' },
+                    },
+                  },
+                ],
+              },
+            },
+          },
+        ],
+        as: 'formularios',
+      },
+    },
+  ];
+}
+
+function mapRequisitosFromAggregationDoc(
+  doc: {
+    _id: unknown;
+    requisitos?: unknown[];
+    plantillasDocumento?: Array<Record<string, unknown>>;
+    formularios?: Array<Record<string, unknown>>;
+  },
+  options?: { onlyActive?: boolean },
+): RequisitoDocumento[] {
+  return (doc.requisitos || [])
+    .filter((req: unknown) => req && typeof req === 'object' && (req as { _id?: unknown })._id)
+    .filter((req: unknown) => {
+      if (!options?.onlyActive) return true;
+      return (req as { activo?: boolean }).activo !== false;
+    })
+    .map((req: unknown): RequisitoDocumento => {
+      const row = req as Record<string, unknown>;
+      const plantillaDocumento = findPlantillaDocumento(
+        doc.plantillasDocumento as Array<{ _id: unknown }> | undefined,
+        row['plantillaDocumentoId'],
+      );
+      const formularioRow = findFormulario(
+        doc.formularios as Array<{ _id: unknown; nombre?: string }> | undefined,
+        row['formularioId'],
+      );
+      if (row['plantillaDocumentoId'] && !plantillaDocumento) {
+        console.warn('[PlantillaChecklistMongoRepository] plantillaDocumento join miss', {
+          requisitoId: String(row['_id']),
+          plantillaDocumentoId: row['plantillaDocumentoId'],
+        });
+      }
+      const plantillaDocumentoId = asOptionalId(row['plantillaDocumentoId']);
+      const formularioId = asOptionalId(row['formularioId']);
+      const mapped: RequisitoDocumento = {
+        id: String(row['_id']),
+        checklistId: String(row['checklistId'] ?? doc._id),
+        tipoRequisito: parseTipoRequisito(row['tipoRequisito']),
+        obligatorio: Boolean(row['obligatorio']),
+        orden: Number(row['orden']) || 0,
+        activo: row['activo'] !== false,
+        ...(plantillaDocumentoId !== undefined && { plantillaDocumentoId }),
+        ...(formularioId !== undefined && { formularioId }),
+        ...(plantillaDocumento && {
+          plantillaDocumento: {
+            id: String(plantillaDocumento._id),
+            codigo: String((plantillaDocumento as { codigo?: string }).codigo ?? ''),
+            nombrePlantilla: String(
+              (plantillaDocumento as { nombrePlantilla?: string }).nombrePlantilla ?? '',
+            ),
+            plantillaUrl: String((plantillaDocumento as { plantillaUrl?: string }).plantillaUrl ?? ''),
+            activo: (plantillaDocumento as { activo?: boolean }).activo !== false,
+          },
+        }),
+        ...(formularioRow && {
+          formulario: {
+            id: String(formularioRow._id),
+            nombre: formularioRow.nombre ?? '',
+            version: Number((formularioRow as { version?: number }).version) || 1,
+            activo: (formularioRow as { activo?: boolean }).activo !== false,
+          },
+        }),
+      };
+      return mapped;
+    });
+}
 
 export class PlantillaChecklistMongoRepository extends BaseMongoRepository<PlantillaChecklist> implements IPlantillaChecklistRepository {
   constructor() {
@@ -111,41 +295,7 @@ export class PlantillaChecklistMongoRepository extends BaseMongoRepository<Plant
             categoriaChecklistIdString: { $toString: "$categoriaChecklistId" }
           }
         },
-        
-        // Lookup para traer requisitos
-        {
-          $lookup: {
-            from: 'requisitos_documento',
-            localField: 'checklistIdString',
-            foreignField: 'checklistId',
-            as: 'requisitos'
-          }
-        },
-        
-        // Lookup para traer plantillaDocumento de cada requisito
-        {
-          $lookup: {
-            from: 'plantilladocumentos',    // Nombre correcto de la colección (plural y minúsculas)
-            let: { requisitosIds: '$requisitos' },
-            pipeline: [
-              {
-                $match: {
-                  $expr: {
-                    $in: ['$_id', {
-                      $map: {
-                        input: '$$requisitosIds',
-                        as: 'req',
-                        in: { $toObjectId: '$$req.plantillaDocumentoId' }
-                      }
-                    }]
-                  }
-                }
-              }
-            ],
-            as: 'plantillasDocumento'
-          }
-        },
-        
+        ...requisitosLookupStages(),
         // Populate de categoría
         {
           $lookup: {
@@ -178,34 +328,7 @@ export class PlantillaChecklistMongoRepository extends BaseMongoRepository<Plant
       } : undefined;
 
       // Formatear requisitos
-      const requisitosDomain = (doc.requisitos || [])
-        .filter((req: any) => req && req._id)
-        .map((req: any) => {
-          // Buscar la plantilla de documento asociada
-          const plantillaDocumento = req.plantillaDocumentoId && doc.plantillasDocumento
-            ? doc.plantillasDocumento.find((pd: any) => pd._id.toString() === req.plantillaDocumentoId)
-            : null;
-
-          return {
-            id: req._id.toString(),
-            checklistId: req.checklistId || doc._id.toString(),
-            tipoRequisito: req.tipoRequisito || 'documento',
-            plantillaDocumentoId: req.plantillaDocumentoId,
-            formularioId: req.formularioId,
-            obligatorio: Boolean(req.obligatorio),
-            orden: Number(req.orden) || 0,
-            activo: req.activo ?? true,
-            plantillaDocumento: plantillaDocumento ? {
-              id: plantillaDocumento._id.toString(),
-              codigo: plantillaDocumento.codigo,
-              nombrePlantilla: plantillaDocumento.nombrePlantilla,
-              plantillaUrl: plantillaDocumento.plantillaUrl,
-              formatosPermitidos: plantillaDocumento.formatosPermitidos,
-              fechaCreacion: plantillaDocumento.fechaCreacion?.toISOString?.() || new Date().toISOString(),
-              activo: plantillaDocumento.activo
-            } : null
-          };
-        });
+      const requisitosDomain = mapRequisitosFromAggregationDoc(doc);
 
       // Construir objeto de dominio
       return {
@@ -344,41 +467,7 @@ export class PlantillaChecklistMongoRepository extends BaseMongoRepository<Plant
             categoriaChecklistIdString: { $toString: "$categoriaChecklistId" }
           }
         },
-        
-        // Lookup para traer requisitos
-        {
-          $lookup: {
-            from: 'requisitos_documento',  //  Nombre real de la colección
-            localField: 'checklistIdString', // Usar el string convertido
-            foreignField: 'checklistId',     // checklistId ya es string
-            as: 'requisitos'
-          }
-        },
-        
-        // Lookup para traer plantillaDocumento de cada requisito
-        {
-          $lookup: {
-            from: 'plantilladocumentos',    // Nombre correcto de la colección (plural y minúsculas)
-            let: { requisitosIds: '$requisitos' },
-            pipeline: [
-              {
-                $match: {
-                  $expr: {
-                    $in: ['$_id', {
-                      $map: {
-                        input: '$$requisitosIds',
-                        as: 'req',
-                        in: { $toObjectId: '$$req.plantillaDocumentoId' }
-                      }
-                    }]
-                  }
-                }
-              }
-            ],
-            as: 'plantillasDocumento'
-          }
-        },
-        
+        ...requisitosLookupStages(),
         // Populate de categoría
         {
           $lookup: {
@@ -429,34 +518,7 @@ export class PlantillaChecklistMongoRepository extends BaseMongoRepository<Plant
         } : undefined;
 
         // Formatear requisitos
-        const requisitosDomain = (doc.requisitos || [])
-          .filter((req: any) => req && req._id)
-          .map((req: any) => {
-            // Buscar la plantilla de documento asociada
-            const plantillaDocumento = req.plantillaDocumentoId && doc.plantillasDocumento
-              ? doc.plantillasDocumento.find((pd: any) => pd._id.toString() === req.plantillaDocumentoId)
-              : null;
-
-            return {
-              id: req._id.toString(),
-              checklistId: req.checklistId || doc._id.toString(),
-              tipoRequisito: req.tipoRequisito || 'documento',
-              plantillaDocumentoId: req.plantillaDocumentoId,
-              formularioId: req.formularioId,
-              obligatorio: Boolean(req.obligatorio),
-              orden: Number(req.orden) || 0,
-              activo: req.activo ?? true,
-              plantillaDocumento: plantillaDocumento ? {
-                id: plantillaDocumento._id.toString(),
-                codigo: plantillaDocumento.codigo,
-                nombrePlantilla: plantillaDocumento.nombrePlantilla,
-                plantillaUrl: plantillaDocumento.plantillaUrl,
-                formatosPermitidos: plantillaDocumento.formatosPermitidos,
-                fechaCreacion: plantillaDocumento.fechaCreacion?.toISOString?.() || new Date().toISOString(),
-                activo: plantillaDocumento.activo
-              } : null
-            };
-          });
+        const requisitosDomain = mapRequisitosFromAggregationDoc(doc);
 
         // Construir objeto de dominio
         return {
@@ -597,41 +659,7 @@ export class PlantillaChecklistMongoRepository extends BaseMongoRepository<Plant
             categoriaChecklistIdString: { $toString: "$categoriaChecklistId" }
           }
         },
-        
-        // Lookup para traer requisitos
-        {
-          $lookup: {
-            from: 'requisitos_documento',
-            localField: 'checklistIdString',
-            foreignField: 'checklistId',
-            as: 'requisitos'
-          }
-        },
-        
-        // Lookup para traer plantillaDocumento de cada requisito
-        {
-          $lookup: {
-            from: 'plantilladocumentos',
-            let: { requisitosIds: '$requisitos' },
-            pipeline: [
-              {
-                $match: {
-                  $expr: {
-                    $in: ['$_id', {
-                      $map: {
-                        input: '$$requisitosIds',
-                        as: 'req',
-                        in: { $toObjectId: '$$req.plantillaDocumentoId' }
-                      }
-                    }]
-                  }
-                }
-              }
-            ],
-            as: 'plantillasDocumento'
-          }
-        },
-        
+        ...requisitosLookupStages(),
         // Populate de categoría
         {
           $lookup: {
@@ -675,35 +703,7 @@ export class PlantillaChecklistMongoRepository extends BaseMongoRepository<Plant
         } : undefined;
 
         // Requisitos activos solamente (usado por obtenerExpedienteCompleto vía batch)
-        const requisitosDomain = (doc.requisitos || [])
-          .filter((req: any) => req && req._id)
-          .filter((req: any) => req.activo !== false)
-          .map((req: any) => {
-            // Buscar la plantilla de documento asociada
-            const plantillaDocumento = req.plantillaDocumentoId && doc.plantillasDocumento
-              ? doc.plantillasDocumento.find((pd: any) => pd._id.toString() === req.plantillaDocumentoId)
-              : null;
-
-            return {
-              id: req._id.toString(),
-              checklistId: req.checklistId || doc._id.toString(),
-              tipoRequisito: req.tipoRequisito || 'documento',
-              plantillaDocumentoId: req.plantillaDocumentoId,
-              formularioId: req.formularioId,
-              obligatorio: Boolean(req.obligatorio),
-              orden: Number(req.orden) || 0,
-              activo: req.activo ?? true,
-              plantillaDocumento: plantillaDocumento ? {
-                id: plantillaDocumento._id.toString(),
-                codigo: plantillaDocumento.codigo,
-                nombrePlantilla: plantillaDocumento.nombrePlantilla,
-                plantillaUrl: plantillaDocumento.plantillaUrl,
-                formatosPermitidos: plantillaDocumento.formatosPermitidos,
-                fechaCreacion: plantillaDocumento.fechaCreacion?.toISOString?.() || new Date().toISOString(),
-                activo: plantillaDocumento.activo
-              } : null
-            };
-          });
+        const requisitosDomain = mapRequisitosFromAggregationDoc(doc, { onlyActive: true });
 
         // Construir objeto de dominio
         return {

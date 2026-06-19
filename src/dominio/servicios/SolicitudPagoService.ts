@@ -314,6 +314,50 @@ export class SolicitudPagoService {
   }
 
   /**
+   * Quita el vínculo entre solicitud aprobada y orden de pago (corrección operativa M2M).
+   */
+  async desvincularConOrdenPagoInacons(
+    solicitudPagoId: string,
+    ordenPagoInaconsId: string,
+    ordenCompraInaconsId: string
+  ): Promise<SolicitudPago> {
+    const opId = ordenPagoInaconsId.trim();
+    const ocId = ordenCompraInaconsId.trim();
+    if (!opId || !ocId) {
+      throw new Error('ordenPagoInaconsId y ordenCompraInaconsId son obligatorios');
+    }
+
+    const solicitud = await this.obtenerSolicitudPago(solicitudPagoId);
+    if (solicitud.estado !== 'APROBADO') {
+      throw new Error('Solo se pueden desvincular solicitudes en estado APROBADO');
+    }
+
+    const expediente = await this.expedientePagoRepository.findById(solicitud.expedienteId);
+    if (!expediente) {
+      throw new Error('Expediente de la solicitud no encontrado');
+    }
+    if (String(expediente.ocId).trim() !== ocId) {
+      throw new Error('La orden de compra no coincide con el expediente de la solicitud');
+    }
+
+    const actual = solicitud.ordenPagoVinculadoId?.trim();
+    if (!actual) {
+      return solicitud;
+    }
+    if (actual !== opId) {
+      throw new Error('La solicitud no está vinculada a la orden de pago indicada');
+    }
+
+    const actualizada = await this.solicitudPagoRepository.update(solicitudPagoId, {
+      ordenPagoVinculadoId: null,
+    });
+    if (!actualizada) {
+      throw new Error('No se pudo desvincular la solicitud de pago');
+    }
+    return actualizada;
+  }
+
+  /**
    * Eliminar una solicitud de pago
    */
   async eliminarSolicitudPago(id: string): Promise<boolean> {

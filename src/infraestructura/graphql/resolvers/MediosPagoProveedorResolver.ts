@@ -33,6 +33,12 @@ export class MediosPagoProveedorResolver {
             'listMediosPagoProveedorNoValidado',
             {}
           ),
+        listMediosPagoProveedorLitleBox: () =>
+          ErrorHandler.handleError(
+            () => this.service.listMediosPagoProveedorLitleBox(),
+            'listMediosPagoProveedorLitleBox',
+            {}
+          ),
       },
       Mutation: {
         addMediosPagoProveedor: (_: unknown, args: MediosPagoProveedorInput) =>

@@ -2,6 +2,7 @@ import express, { Application } from 'express';
 import { ApolloServer } from 'apollo-server-express';
 import { ApolloServerPluginLandingPageGraphQLPlayground } from 'apollo-server-core';
 import { makeExecutableSchema } from '@graphql-tools/schema';
+import { applyMiddleware } from 'graphql-middleware';
 import cors from 'cors';
 import http from 'http';
 import { logger } from '../logging';
@@ -9,6 +10,10 @@ import { HealthCheckService } from '../health/HealthCheckService';
 import { DatabaseHealthCheck } from '../health/DatabaseHealthCheck';
 
 import { ConfigService } from './ConfigService';
+import { buildPermissions } from '../graphql/auth/permissions';
+import { decodificarClaims } from '../auth/tokenContext';
+import { createGatewayValidationMiddleware } from '../auth/gatewayValidationMiddleware';
+import { JWTUtils } from '../auth/JWTUtils';
 
 const configService = ConfigService.getInstance();
 
@@ -98,9 +103,18 @@ export const createServer = (resolvers: any, typeDefs: any): { app: Application;
   httpServer.keepAliveTimeout = 120000;
   httpServer.headersTimeout = 125000;
 
+  // Bloqueo de acceso directo: solo gateway (X-Gateway-Secret) o proveedor
+  // local válido cuando REQUIRE_GATEWAY_SECRET=true. Montado antes de Apollo.
+  app.use('/graphql', createGatewayValidationMiddleware(configService));
+
+  // shield: autoriza por operación (admin IAM+sistema O proveedor local).
+  const baseSchema = makeExecutableSchema({ typeDefs, resolvers });
+  const schema = applyMiddleware(baseSchema, buildPermissions(configService));
+
   const apolloServer = new ApolloServer({
-    schema: makeExecutableSchema({ typeDefs, resolvers }),
+    schema,
     introspection: true,
+<<<<<<< HEAD
     context: ({ req }) => ({
       req,
       token: req.headers.authorization?.split(' ')[1],
@@ -108,6 +122,70 @@ export const createServer = (resolvers: any, typeDefs: any): { app: Application;
         (typeof req.headers['x-service-token'] === 'string' ? req.headers['x-service-token'] : undefined)
         ?? req.headers.authorization?.split(' ')[1],
     }),
+=======
+    context: async ({ req }) => {
+      const bearer = req.headers.authorization?.replace(/^Bearer\s+/i, '').trim();
+
+      // Discrimina por tipo de token:
+      //  · IAM (RS256, tiene sid) → ADMIN. El gateway ya validó la firma; aquí
+      //    solo se DECODIFICAN los claims.
+      //  · local (HS256) → PROVEEDOR externo (no está en el IAM): se valida LOCAL.
+      let usuarioAuth: ReturnType<typeof decodificarClaims> = null;
+      let user:
+        | { id?: string; tipo_usuario?: 'admin' | 'proveedor'; proveedor_id?: string | null; role?: string }
+        | null = null;
+      let authMotivo: string | undefined;
+
+      // Llamada M2M este-oeste: el gateway interno inyecta X-Internal-Gateway-Secret.
+      // Si coincide → consumo interno confiable. En ese caso el `Authorization` es
+      // el JWT de SERVICIO (RS256) que reenvía el internal, NO un token de usuario;
+      // por eso NO se intenta validar como admin/proveedor (evita el WARN
+      // "invalid algorithm" y trabajo inútil).
+      const upstreamSecret = configService.getInternalUpstreamSecret();
+      const recibido = req.headers['x-internal-gateway-secret'];
+      const internalTrusted =
+        !!upstreamSecret &&
+        typeof recibido === 'string' &&
+        recibido === upstreamSecret;
+
+      // Usuario: interna → viene en x-user-token (reenviado por el gateway);
+      // edge → en Authorization. Se DECODIFICA, no se re-valida (ya se validó
+      // en el edge).
+      const xUserTokenHeader = req.headers['x-user-token'];
+      const userTokenRaw = internalTrusted
+        ? (typeof xUserTokenHeader === 'string' ? xUserTokenHeader.replace(/^Bearer\s+/i, '').trim() : undefined)
+        : bearer;
+
+      // Discrimina por tipo de token:
+      //  · IAM (RS256, tiene sid) → ADMIN. El gateway ya validó la firma; aquí
+      //    solo se DECODIFICAN los claims.
+      //  · local (HS256) → PROVEEDOR externo (no está en el IAM): se valida LOCAL.
+      if (userTokenRaw) {
+        const claims = decodificarClaims(userTokenRaw);
+        if (claims?.sid) {
+          usuarioAuth = claims;
+          user = {
+            id: claims.sub,
+            tipo_usuario: 'admin',
+            proveedor_id: null,
+            ...(claims.rol ? { role: claims.rol } : {}),
+          };
+        } else {
+          try {
+            const local = JWTUtils.validateToken(userTokenRaw);
+            if (local) user = local;
+          } catch (e) {
+            authMotivo =
+              e instanceof Error && e.message.includes('expirado')
+                ? 'TOKEN_EXPIRADO'
+                : 'TOKEN_INVALIDO';
+          }
+        }
+      }
+
+      return { req, token: bearer, usuarioAuth, user, authMotivo, internalTrusted };
+    },
+>>>>>>> e87abc3c3a1ca6a270b064219cb1aa2f1d53781d
     plugins: [ApolloServerPluginLandingPageGraphQLPlayground()],
     persistedQueries: false,
     formatError: (error: any): any => {

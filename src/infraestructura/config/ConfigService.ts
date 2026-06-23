@@ -45,7 +45,17 @@ export class ConfigService {
       'GOOGLE_CLOUD_CREDENTIALS_JSON',
       'INACONS_BACKEND_URL',
       'PERSONAL_BACKEND_URL',
-      'CORS_ORIGINS'
+      'CORS_ORIGINS',
+      // --- Autenticación centralizada (kapo-autentificacion) ---
+      'SISTEMA_CODIGO',
+      'AUTH_BACKEND_URL',
+      // --- Gateway (plan unificación) ---
+      'INTERNAL_GATEWAY_SECRET',
+      'REQUIRE_GATEWAY_SECRET',
+      'INTERNAL_UPSTREAM_SECRET', // confianza M2M este-oeste (gateway interno → este MS, rol TARGET)
+      // --- Gateway INTERNO (este-oeste / M2M) — rol CALLER: consumir data de otros MS ---
+      'INTERNAL_GATEWAY_URL',     // base del kapo-gateway-internal
+      'INTERNAL_SERVICE_TOKEN',   // pase JWT de servicio (sub=service:proveedores)
     ];
 
     envVars.forEach(envVar => {
@@ -118,6 +128,55 @@ export class ConfigService {
    */
   getServerPort(): number {
     return this.getNumber('PORT', 8080);
+  }
+
+  // ==========================================================================
+  // Autenticación centralizada (kapo-autentificacion) + gateway
+  // ==========================================================================
+
+  /** Código de este sistema en auth (claim `sistema` del token admin). */
+  getSistemaCodigo(): string {
+    return this.getOrDefault('SISTEMA_CODIGO', 'proveedores');
+  }
+
+  /** GraphQL de auth (identidad/usuarios admin). */
+  getAuthBackendUrl(): string {
+    return this.getOrDefault('AUTH_BACKEND_URL', 'http://localhost:8079/graphql');
+  }
+
+  /** Secreto compartido con el gateway (header X-Gateway-Secret). */
+  getInternalGatewaySecret(): string {
+    return this.getOrDefault('INTERNAL_GATEWAY_SECRET', '');
+  }
+
+  /**
+   * Secreto que el GATEWAY INTERNO inyecta como X-Internal-Gateway-Secret.
+   * Si llega y coincide (sin usuario) → llamada M2M este-oeste confiable.
+   */
+  getInternalUpstreamSecret(): string {
+    return this.getOrDefault('INTERNAL_UPSTREAM_SECRET', '');
+  }
+
+  // ==========================================================================
+  // Gateway INTERNO (este-oeste / M2M) — rol CALLER: consumir data de otros MS
+  // ==========================================================================
+
+  /** Base del gateway interno (ej. http://localhost:8091). */
+  getInternalGatewayUrl(): string {
+    return this.getOrDefault('INTERNAL_GATEWAY_URL', 'http://localhost:8091');
+  }
+
+  /** Pase JWT de servicio (firmado por auth) para pasar el gateway interno. */
+  getInternalServiceToken(): string {
+    return this.getOrDefault('INTERNAL_SERVICE_TOKEN', '');
+  }
+
+  /**
+   * Si true, /graphql solo acepta peticiones con X-Gateway-Secret válido (o
+   * token proveedor local). false en dev; true en producción.
+   */
+  requireGatewaySecret(): boolean {
+    return this.getBoolean('REQUIRE_GATEWAY_SECRET', false);
   }
 
   /**

@@ -1,16 +1,20 @@
 import mongoose, { Types } from 'mongoose';
 import { IMediosPagoProveedorRepository } from '../../../dominio/repositorios/IMediosPagoProveedorRepository';
 import {
+  MedioPagoLitleBox,
   MediosPagoProveedor,
   MediosPagoProveedorInput,
+  MediosPagoProveedorLitleBoxGroup,
   MediosPagoProveedorUpdateInput,
   MediosPagoNoValidadoFilter,
   MediosPagoProveedorPaginatedResponse,
+  ProveedorLitleBox,
 } from '../../../dominio/entidades/MediosPagoProveedor';
 import { Proveedor } from '../../../dominio/entidades/Proveedor';
 import { Banco } from '../../../dominio/entidades/Banco';
 import { MediosPagoProveedorModel } from './schemas/MediosPagoProveedorSchema';
 import { ArchivoSustentoProveedorModel } from './schemas/ArchivoSustentoProveedorSchema';
+import { ProveedorModel } from './schemas/ProveedorSchema';
 
 export class MediosPagoProveedorMongoRepository implements IMediosPagoProveedorRepository {
   private proveedorToDomain(doc: any): Proveedor | null {
@@ -73,6 +77,114 @@ export class MediosPagoProveedorMongoRepository implements IMediosPagoProveedorR
       .populate('proveedor_id')
       .populate('entidad');
     return docs.map((d) => this.toDomain(d));
+  }
+
+  async listMediosPagoProveedorLitleBox(): Promise<MediosPagoProveedorLitleBoxGroup[]> {
+    const rows = await ProveedorModel.aggregate([
+      { $match: { tipo: 'CAJA CHICA' } },
+      {
+        $lookup: {
+          from: 'medios_pago_proveedor',
+          let: { proveedorId: '$_id' },
+          pipeline: [
+            { $match: { $expr: { $eq: ['$proveedor_id', '$$proveedorId'] } } },
+            {
+              $lookup: {
+                from: 'banco',
+                localField: 'entidad',
+                foreignField: '_id',
+                as: 'entidad',
+              },
+            },
+            { $unwind: { path: '$entidad', preserveNullAndEmptyArrays: true } },
+          ],
+          as: 'medios_pago',
+        },
+      },
+      {
+        $project: {
+          _id: 0,
+          proveedor_id: {
+            id: '$_id',
+            razon_social: '$razon_social',
+            nombre_comercial: '$nombre_comercial',
+            tipo: '$tipo',
+            ruc: '$ruc',
+            direccion: '$direccion',
+            rubro: '$rubro',
+            estado: '$estado',
+            actividad: '$actividad',
+            correo: '$correo',
+            horario: '$horario',
+          },
+          medios_pago: {
+            $map: {
+              input: '$medios_pago',
+              as: 'medio',
+              in: {
+                id: '$$medio._id',
+                nro_cuenta: '$$medio.nro_cuenta',
+                entidad: {
+                  id: '$$medio.entidad._id',
+                  nombre: '$$medio.entidad.nombre',
+                  abreviatura: '$$medio.entidad.abreviatura',
+                },
+                detalles: '$$medio.detalles',
+                titular: '$$medio.titular',
+                validado: '$$medio.validado',
+                mostrar: '$$medio.mostrar',
+              },
+            },
+          },
+        },
+      },
+    ]);
+
+    return rows.map((row) => this.litleBoxGroupToDomain(row));
+  }
+
+  private litleBoxGroupToDomain(row: Record<string, unknown>): MediosPagoProveedorLitleBoxGroup {
+    const provRaw = row.proveedor_id;
+    const prov =
+      provRaw && typeof provRaw === 'object'
+        ? (provRaw as Record<string, unknown>)
+        : ({} as Record<string, unknown>);
+    const proveedor_id: ProveedorLitleBox = {
+      id: String(prov.id ?? ''),
+      razon_social: String(prov.razon_social ?? ''),
+      nombre_comercial: prov.nombre_comercial != null ? String(prov.nombre_comercial) : null,
+      tipo: String(prov.tipo ?? 'CAJA CHICA'),
+      ruc: prov.ruc != null ? String(prov.ruc) : '',
+      direccion: prov.direccion != null ? String(prov.direccion) : null,
+      rubro: prov.rubro != null ? String(prov.rubro) : null,
+      estado: prov.estado != null ? String(prov.estado) : null,
+      actividad: prov.actividad != null ? String(prov.actividad) : null,
+      correo: prov.correo != null ? String(prov.correo) : null,
+      horario: prov.horario != null ? String(prov.horario) : null,
+    };
+
+    const mediosRaw = Array.isArray(row.medios_pago) ? row.medios_pago : [];
+    const medios_pago: MedioPagoLitleBox[] = mediosRaw.map((m) => {
+      const o = m && typeof m === 'object' ? (m as Record<string, unknown>) : {};
+      const ent = o.entidad && typeof o.entidad === 'object' ? (o.entidad as Record<string, unknown>) : null;
+      return {
+        id: String(o.id ?? ''),
+        nro_cuenta: o.nro_cuenta != null ? String(o.nro_cuenta) : null,
+        entidad: ent
+          ? {
+              id: ent.id != null ? String(ent.id) : '',
+              nombre: ent.nombre != null ? String(ent.nombre) : '',
+              abreviatura: ent.abreviatura != null ? String(ent.abreviatura) : '',
+            }
+          : null,
+        detalles: o.detalles != null ? String(o.detalles) : null,
+        titular: o.titular != null ? String(o.titular) : null,
+        validado: o.validado != null ? Boolean(o.validado) : null,
+        mostrar: o.mostrar != null ? Boolean(o.mostrar) : null,
+      };
+    });
+
+    return { proveedor_id, medios_pago };
   }
 
   async listMediosPagoProveedorNoValidado(

@@ -2,9 +2,11 @@
 // GUARDIAS DE GRAPHQL
 // ============================================================================
 
-import { JWTUtils } from './JWTUtils';
+import { JWTUtils, type JWTPayload } from './JWTUtils';
 import { logger } from '../logging';
 import { ServiceIntegrationAuthRules } from '../../dominio/servicios/ServiceIntegrationAuthRules';
+
+type JWTPayloadLike = JWTPayload;
 
 export interface GraphQLContext {
   req?: {
@@ -49,28 +51,26 @@ export const authGuard = (
 
   return async (parent: any, args: any, context: GraphQLContext, info: any): Promise<any> => {
     try {
-      // Extraer token del contexto
-      const token = context.req?.headers?.authorization 
-        ? JWTUtils.extractTokenFromHeader(context.req.headers.authorization)
-        : null;
+      // El usuario YA viene resuelto en el context (server.ts): admin desde los
+      // claims del IAM (token RS256 ya validado por el gateway) o proveedor
+      // desde su token local (HS256 validado en el context). El guard ya NO
+      // re-valida el token — solo aplica la autorización fina de negocio.
+      const payload = context.user as JWTPayloadLike | undefined;
 
-      // Si no hay token y no es requerido, continuar sin autenticación
-      if (!token && !required) {
-        logger.debug('No se proporcionó token, pero no es requerido en GraphQL');
+      // Si no hay usuario y no es requerido, continuar sin autenticación
+      if (!payload && !required) {
+        logger.debug('No hay usuario en contexto, pero no es requerido en GraphQL');
         return await resolver(parent, args, context, info);
       }
 
-      // Si no hay token y es requerido, rechazar
-      if (!token) {
-        logger.warn('Token no proporcionado en petición GraphQL', {
+      // Si no hay usuario y es requerido, rechazar
+      if (!payload) {
+        logger.warn('Usuario no autenticado en petición GraphQL', {
           operation: info.operation?.name?.value || 'desconocida',
           fieldName: info.fieldName
         });
         throw new Error('AUTENTICACION_REQUERIDA: Token de autenticación requerido');
       }
-
-      // Validar el token
-      const payload = JWTUtils.validateToken(token);
 
       // Verificar tipo de usuario permitido
       if (!allowedTypes.includes(payload.tipo_usuario)) {

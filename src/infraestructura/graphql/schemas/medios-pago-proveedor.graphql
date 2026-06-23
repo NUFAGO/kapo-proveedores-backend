@@ -1,9 +1,8 @@
 # ============================================================================
 # SCHEMA DE MEDIOS DE PAGO DE PROVEEDOR (migrado desde inacons)
 # Los tipos Proveedor y Banco se definen en proveedor.graphql y banco.graphql.
-# NOTA: las queries listMediosPagoProveedorLitleBox y
-# listMediosPagoProveedorNoValidadoWithArchivo de inacons NO se migran
-# (dependen de archivos_sustento / horario fuera de alcance).
+# NOTA: listMediosPagoProveedorNoValidadoWithArchivo de inacons NO se migra
+# (depende de archivos_sustento fuera de alcance del listado simple).
 # ============================================================================
 
 type MediosPagoProveedor {
@@ -25,9 +24,39 @@ type MediosPagoProveedorPaginatedResponse {
   totalPages: Int!
 }
 
+type MediosPagoProveedorLitleBox {
+  proveedor_id: ProveedorLitleBox!
+  medios_pago: [MedioPagoLitleBox!]!
+}
+
+type MedioPagoLitleBox {
+  id: ID!
+  nro_cuenta: String
+  entidad: Banco
+  detalles: String
+  titular: String
+  validado: Boolean
+  mostrar: Boolean
+}
+
+type ProveedorLitleBox {
+  id: ID!
+  razon_social: String!
+  nombre_comercial: String
+  tipo: String!
+  ruc: String!
+  direccion: String
+  rubro: String
+  estado: String
+  actividad: String
+  correo: String
+  horario: String
+}
+
 extend type Query {
   listMediosPagoProveedores: [MediosPagoProveedor!]!
   listMediosPagoProveedorByProveedor(proveedor_id: ID!): [MediosPagoProveedor!]!
+  listMediosPagoProveedorLitleBox: [MediosPagoProveedorLitleBox!]!
   listMediosPagoProveedorNoValidado(page: Int, limit: Int, search: String): MediosPagoProveedorPaginatedResponse!
 }
 

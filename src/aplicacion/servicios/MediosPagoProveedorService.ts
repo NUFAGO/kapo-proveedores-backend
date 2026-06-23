@@ -24,6 +24,10 @@ export class MediosPagoProveedorService {
     return this.repo.listMediosPagoProveedorNoValidado(filter);
   }
 
+  listMediosPagoProveedorLitleBox() {
+    return this.repo.listMediosPagoProveedorLitleBox();
+  }
+
   addMediosPagoProveedor(input: MediosPagoProveedorInput): Promise<MediosPagoProveedor | null> {
     if (!input.proveedor_id) throw new Error('proveedor_id es obligatorio');
     return this.repo.addMediosPagoProveedor(input);

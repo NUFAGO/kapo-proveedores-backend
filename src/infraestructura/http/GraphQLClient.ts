@@ -28,6 +28,7 @@ export interface GraphQLClientConfig {
     resetTimeout?: number;
   };
   retry?: RetryPolicyConfig;
+  headers?: Record<string, string>; // Cabeceras extra (ej. Authorization en llamadas M2M)
 }
 
 /**
@@ -40,6 +41,7 @@ export class GraphQLClient {
   private retryPolicy: RetryPolicy;
   private semaphore: Semaphore;
   private timeout: number;
+  private extraHeaders: Record<string, string>;
 
   constructor(
     endpoint: string,
@@ -47,6 +49,7 @@ export class GraphQLClient {
   ) {
     this.endpoint = endpoint;
     this.timeout = config.timeout || 5000;
+    this.extraHeaders = config.headers ?? {};
 
     // Inicializar Circuit Breaker
     this.circuitBreaker = new CircuitBreaker({
@@ -105,6 +108,7 @@ export class GraphQLClient {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          ...this.extraHeaders,
         },
         body: JSON.stringify(requestBody),
         signal: controller.signal

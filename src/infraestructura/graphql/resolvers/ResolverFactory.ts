@@ -3,8 +3,6 @@
 // ============================================================================
 
 import { scalarResolvers } from './scalars';
-import { AuthResolver } from './AuthResolver';
-import { AuthAdminResolver } from './AuthAdminResolver';
 import { AuthProveedorResolver } from './AuthProveedorResolver';
 import { UsuarioProveedorResolver } from './UsuarioProveedorResolver';
 import { UsuarioExternoResolver } from './UsuarioExternoResolver';
@@ -32,9 +30,7 @@ import { SolicitudPagoResolver } from './SolicitudPagoResolver';
 import { ReporteSolicitudPagoResolver } from './ReporteSolicitudPagoResolver';
 import { DashboardResolver } from './DashboardResolver';
 import { Container } from '../../di/Container';
-import { AuthService } from '../../../aplicacion/servicios/AuthService';
 import { UsuarioExternoService } from '../../../aplicacion/servicios/UsuarioExternoService';
-import { AuthAdminService } from '../../../aplicacion/servicios/AuthAdminService';
 import { AuthProveedorService } from '../../../aplicacion/servicios/AuthProveedorService';
 import { UsuarioProveedorService } from '../../../aplicacion/servicios/UsuarioProveedorService';
 import { CategoriaChecklistService } from '../../../dominio/servicios/CategoriaChecklistService';
@@ -178,12 +174,9 @@ export class ResolverFactory {
       return new DocumentoOCService(documentoOCRepo, expedienteRepo, expedientePagoService);
     }, true);
     
-    // Registrar AuthService (usa HttpAuthRepository)
-    container.register('AuthService', (c: any) => {
-      const httpAuthRepo = c.resolve('HttpAuthRepository');
-      return new AuthService(httpAuthRepo);
-    }, true);
-
+    // Auth admin/inacons ELIMINADO: la identidad admin la maneja
+    // kapo-autentificacion vía el gateway. Quedan las queries de usuario
+    // (UsuarioExterno) contra auth y el flujo proveedor (local).
     container.register('UsuarioExternoService', (c: any) => {
       const httpAuthRepo = c.resolve('HttpAuthRepository');
       return new UsuarioExternoService(httpAuthRepo);
@@ -198,12 +191,6 @@ export class ResolverFactory {
     container.register('UsuarioProveedorService', (c: any) => {
       const usuarioProveedorRepo = c.resolve('UsuarioProveedorMongoRepository');
       return new UsuarioProveedorService(usuarioProveedorRepo);
-    }, true);
-    
-    // Registrar AuthAdminService (usa AuthService)
-    container.register('AuthAdminService', (c: any) => {
-      const authService = c.resolve('AuthService');
-      return new AuthAdminService(authService);
     }, true);
     
     // Registrar AuthProveedorService (usa UsuarioProveedorService)
@@ -241,18 +228,6 @@ export class ResolverFactory {
       const plantillaDocumentoService = c.resolve('PlantillaDocumentoService');
       const plantillaRepo = c.resolve('PlantillaChecklistMongoRepository');
       return new RequisitoDocumentoService(requisitoRepo, plantillaDocumentoService, plantillaRepo);
-    }, true);
-    
-    // Registrar AuthResolver
-    container.register('AuthResolver', (c: any) => {
-      const authService = c.resolve('AuthService');
-      return new AuthResolver(authService);
-    }, true);
-    
-    // Registrar AuthAdminResolver
-    container.register('AuthAdminResolver', (c: any) => {
-      const authAdminService = c.resolve('AuthAdminService');
-      return new AuthAdminResolver(authAdminService);
     }, true);
     
     // Registrar AuthProveedorResolver
@@ -524,16 +499,8 @@ export class ResolverFactory {
     const container = this.getContainer();
     
     try {
-      // Crear AuthResolver
-      const authResolver = container.resolve<AuthResolver>('AuthResolver');
-      resolvers.push(authResolver.getResolvers());
-      logger.debug('Resolver configurado: auth');
-      
-      // Crear AuthAdminResolver
-      const authAdminResolver = container.resolve<AuthAdminResolver>('AuthAdminResolver');
-      resolvers.push(authAdminResolver.getResolvers());
-      logger.debug('Resolver configurado: authAdmin');
-      
+      // Auth admin (login/loginAdmin) ELIMINADO — identidad admin vía gateway→auth.
+
       // Crear AuthProveedorResolver
       const authProveedorResolver = container.resolve<AuthProveedorResolver>('AuthProveedorResolver');
       resolvers.push(authProveedorResolver.getResolvers());

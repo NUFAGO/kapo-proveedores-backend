@@ -114,15 +114,6 @@ export const createServer = (resolvers: any, typeDefs: any): { app: Application;
   const apolloServer = new ApolloServer({
     schema,
     introspection: true,
-<<<<<<< HEAD
-    context: ({ req }) => ({
-      req,
-      token: req.headers.authorization?.split(' ')[1],
-      serviceToken:
-        (typeof req.headers['x-service-token'] === 'string' ? req.headers['x-service-token'] : undefined)
-        ?? req.headers.authorization?.split(' ')[1],
-    }),
-=======
     context: async ({ req }) => {
       const bearer = req.headers.authorization?.replace(/^Bearer\s+/i, '').trim();
 
@@ -185,7 +176,6 @@ export const createServer = (resolvers: any, typeDefs: any): { app: Application;
 
       return { req, token: bearer, usuarioAuth, user, authMotivo, internalTrusted };
     },
->>>>>>> e87abc3c3a1ca6a270b064219cb1aa2f1d53781d
     plugins: [ApolloServerPluginLandingPageGraphQLPlayground()],
     persistedQueries: false,
     formatError: (error: any): any => {

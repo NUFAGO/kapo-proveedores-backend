@@ -14,6 +14,7 @@ import { buildPermissions } from '../graphql/auth/permissions';
 import { decodificarClaims } from '../auth/tokenContext';
 import { createGatewayValidationMiddleware } from '../auth/gatewayValidationMiddleware';
 import { JWTUtils } from '../auth/JWTUtils';
+import { runWithRequestContext } from '../auth/requestContext';
 
 const configService = ConfigService.getInstance();
 
@@ -102,6 +103,26 @@ export const createServer = (resolvers: any, typeDefs: any): { app: Application;
   httpServer.timeout = config.timeout + 300000;
   httpServer.keepAliveTimeout = 120000;
   httpServer.headersTimeout = 125000;
+
+  // Propaga el JWT del usuario (admin IAM o interno) en AsyncLocalStorage para
+  // que HttpAuthRepository pueda reenviarlo a auth-service sin recibirlo por arg.
+  // Se monta ANTES del middleware de validación del gateway.
+  app.use('/graphql', (req, _res, next) => {
+    const authHeader = req.headers.authorization;
+    const bearerToken =
+      typeof authHeader === 'string' ? authHeader.split(' ')[1]?.trim() : undefined;
+    const upstreamSecret = configService.getInternalUpstreamSecret();
+    const recibido = req.headers['x-internal-gateway-secret'];
+    const internalTrusted =
+      !!upstreamSecret && typeof recibido === 'string' && recibido === upstreamSecret;
+    const xUserToken = req.headers['x-user-token'];
+    const userToken = internalTrusted
+      ? (typeof xUserToken === 'string'
+          ? xUserToken.replace(/^Bearer\s+/i, '').trim() || undefined
+          : undefined)
+      : bearerToken || undefined;
+    runWithRequestContext(userToken, () => next());
+  });
 
   // Bloqueo de acceso directo: solo gateway (X-Gateway-Secret) o proveedor
   // local válido cuando REQUIRE_GATEWAY_SECRET=true. Montado antes de Apollo.

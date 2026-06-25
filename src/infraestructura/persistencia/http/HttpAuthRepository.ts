@@ -3,6 +3,7 @@ import { UsuarioExternoResponse } from '../../../dominio/entidades/UsuarioExtern
 import { GraphQLClient } from '../../http/GraphQLClient';
 import { BaseHttpRepository } from './BaseHttpRepository';
 import { ConfigService } from '../../config/ConfigService';
+import { getRequestUserToken } from '../../auth/requestContext';
 
 // ============================================================================
 // ADAPTADOR HTTP → kapo-autentificacion (IAM central).
@@ -108,6 +109,14 @@ export class HttpAuthRepository
   }
 
   public override async graphqlRequest(query: string, variables: any = {}): Promise<any> {
+    const userToken = getRequestUserToken();
+    if (userToken?.trim()) {
+      const url = await this.serviceRegistry.getServiceUrl('auth-service');
+      const client = new GraphQLClient(url, { headers: { Authorization: `Bearer ${userToken.trim()}` } });
+      const request: { query: string; variables?: any } = { query };
+      if (variables && Object.keys(variables).length > 0) request.variables = variables;
+      return client.request(request);
+    }
     return super.graphqlRequest(query, variables, 'auth-service', 'auth-service');
   }
 

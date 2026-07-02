@@ -178,6 +178,17 @@ function mapRequisitosFromAggregationDoc(
             ),
             plantillaUrl: String((plantillaDocumento as { plantillaUrl?: string }).plantillaUrl ?? ''),
             activo: (plantillaDocumento as { activo?: boolean }).activo !== false,
+            // Regresión en commit 929395a: al pasar el mapeo a agregación se dejó de
+            // proyectar fechaCreacion, pero el tipo GraphQL la exige (DateTime!) → GraphQL
+            // recibía undefined y anulaba todo el plantillaDocumento. Se restaura con el
+            // mismo fallback del mapper anterior; si el doc migrado no la trae, cae al
+            // timestamp del ObjectId (fecha real de creación) y en último caso a "ahora".
+            fechaCreacion:
+              (plantillaDocumento as { fechaCreacion?: Date }).fechaCreacion?.toISOString?.() ||
+              (plantillaDocumento._id as { getTimestamp?: () => Date })?.getTimestamp?.()?.toISOString?.() ||
+              new Date().toISOString(),
+            fechaActualizacion:
+              (plantillaDocumento as { fechaActualizacion?: Date }).fechaActualizacion?.toISOString?.() ?? null,
           },
         }),
         ...(formularioRow && {

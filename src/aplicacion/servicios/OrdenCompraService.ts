@@ -1,8 +1,11 @@
 import { IOrdenCompraRepository, OrdenCompraFilter, OrdenCompraPaginatedResponse } from '../../dominio/repositorios/IOrdenCompraRepository';
 import {
   collectProveedorIdsFromComprasRows,
+  collectProveedorIdsFromRevisionRows,
   mapComprasRowToProveedoresOc,
+  mapComprasRowToOcRevision,
   type ComprasOrdenCompraRow,
+  type ComprasOrdenCompraRevisionRow,
 } from '../../dominio/servicios/OrdenCompraComprasMapper';
 import { HttpOrdenCompraRepository } from '../../infraestructura/persistencia/http/HttpOrdenCompraRepository';
 import { logger } from '../../infraestructura/logging';
@@ -41,6 +44,36 @@ export class OrdenCompraService {
       };
     } catch (error) {
       logger.error('Error consumiendo listOrdenComprasPaginated de Kapo-Compras', {
+        error: error instanceof Error ? error.message : String(error),
+        filter,
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Variante LEAN para `revision-asignacion/ordenes-compra` (solo servicios):
+   * lee de Compras únicamente su dominio e hidrata el proveedor (id + nombre_comercial)
+   * con NUESTRA data. Payload mínimo y sin depender de hidrataciones cross-MS de Compras.
+   */
+  async listOrdenComprasServicioRevision(filter?: OrdenCompraFilter): Promise<OrdenCompraPaginatedResponse> {
+    try {
+      logger.info('Consumiendo listOrdenComprasRevision (lean) de Kapo-Compras', { filter });
+
+      const result = await this.repository.listOrdenComprasRevision(filter);
+      const rows = result.data as ComprasOrdenCompraRevisionRow[];
+
+      const proveedorById = new Map<string, import('../../dominio/entidades/Proveedor').Proveedor>();
+      if (this.proveedorService && rows.length) {
+        const ids = collectProveedorIdsFromRevisionRows(rows);
+        const proveedores = await this.proveedorService.obtenerProveedoresPorIds(ids);
+        for (const p of proveedores) proveedorById.set(p.id, p);
+      }
+
+      const data = rows.map((row) => mapComprasRowToOcRevision(row, proveedorById));
+      return { ...result, data };
+    } catch (error) {
+      logger.error('Error consumiendo listOrdenComprasRevision (lean) de Kapo-Compras', {
         error: error instanceof Error ? error.message : String(error),
         filter,
       });

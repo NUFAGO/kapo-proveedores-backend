@@ -13,6 +13,7 @@ import { logger } from '../../logging';
 const INTERNAL_GATEWAY_PATHS: Record<string, string> = {
   'requerimientos-backend': '/requerimientos/graphql',
   'presupuestos-backend': '/presupuesto/graphql',
+  'kapo-compras-backend': '/compras/graphql',
 };
 
 /**

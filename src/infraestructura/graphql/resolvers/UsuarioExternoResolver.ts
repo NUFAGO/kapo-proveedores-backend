@@ -41,10 +41,7 @@ export class UsuarioExternoResolver {
             if (!user?.id) return false;
             return ErrorHandler.handleError(
               () =>
-                this.usuarioExternoService.puedeAprobarProveedorKanban(
-                  user.id,
-                  user.role?.nombre
-                ),
+                this.usuarioExternoService.puedeAprobarProveedorKanban(user.id),
               'puedeAprobarProveedorKanban'
             );
           }

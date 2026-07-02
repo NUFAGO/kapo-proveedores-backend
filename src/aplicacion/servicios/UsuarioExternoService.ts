@@ -1,11 +1,11 @@
 import { UsuarioExternoResponse } from '../../dominio/entidades/UsuarioExterno';
 import { IUsuarioExternoRepository } from '../../dominio/repositorios/IUsuarioExternoRepository';
 
-/** Paridad inacons kanban proveedor: rol cuyo nombre contiene "conta". */
+/** Aprobador del kanban proveedor: rol cuyo NOMBRE contiene "conta". */
 export const ROL_REGEX_APROBADOR_PROVEEDOR = 'conta';
 
-/** Paridad inacons: jerarquía 4 = Gerencia en maestro de cargos. */
-export const JERARQUIA_GERENCIA_APROBADOR_PROVEEDOR = 4;
+/** Jerarquías de cargo que pueden aprobar: Supervisor (3) y Gerencia (4). */
+export const JERARQUIAS_APROBADOR_PROVEEDOR = [3, 4] as const;
 
 export function usuarioPuedeAprobarProveedorKanban(params: {
   roleNombre?: string | null;
@@ -13,7 +13,10 @@ export function usuarioPuedeAprobarProveedorKanban(params: {
 }): boolean {
   const rol = (params.roleNombre ?? '').trim().toLowerCase();
   if (rol.includes(ROL_REGEX_APROBADOR_PROVEEDOR.toLowerCase())) return true;
-  return params.cargoGerarquia === JERARQUIA_GERENCIA_APROBADOR_PROVEEDOR;
+  return (
+    params.cargoGerarquia != null &&
+    (JERARQUIAS_APROBADOR_PROVEEDOR as readonly number[]).includes(params.cargoGerarquia)
+  );
 }
 
 function dedupeUsuarios(listas: UsuarioExternoResponse[][]): UsuarioExternoResponse[] {
@@ -51,25 +54,27 @@ export class UsuarioExternoService {
     return this.repo.getUsuariosByRolCargo(jerarquia, rolRegex);
   }
 
-  /** Contabilidad (rol *conta*) ∪ Gerencia (jerarquía 4), sin duplicados. */
+  /** Rol *conta* ∪ Supervisor (3) ∪ Gerencia (4), sin duplicados, cross-sistema. */
   async listarAprobadoresProveedorKanban(): Promise<UsuarioExternoResponse[]> {
-    const [porRol, porJerarquia] = await Promise.all([
+    const [porRol, ...porJerarquia] = await Promise.all([
       this.repo.getUsuariosByRolCargo(undefined, ROL_REGEX_APROBADOR_PROVEEDOR),
-      this.repo.getUsuariosByRolCargo(JERARQUIA_GERENCIA_APROBADOR_PROVEEDOR, undefined),
+      ...JERARQUIAS_APROBADOR_PROVEEDOR.map((j) =>
+        this.repo.getUsuariosByRolCargo(j, undefined)
+      ),
     ]);
-    return dedupeUsuarios([porRol, porJerarquia]);
+    return dedupeUsuarios([porRol, ...porJerarquia]);
   }
 
-  async puedeAprobarProveedorKanban(
-    usuarioId: string,
-    roleNombre?: string | null
-  ): Promise<boolean> {
-    const perfil = await this.repo.getUsuario(usuarioId);
-    const gerarquia =
-      perfil?.cargo_id?.gerarquia != null ? Number(perfil.cargo_id.gerarquia) : null;
-    return usuarioPuedeAprobarProveedorKanban({
-      roleNombre: roleNombre ?? null,
-      cargoGerarquia: Number.isFinite(gerarquia) ? gerarquia : null,
-    });
+  /**
+   * ¿Puede aprobar en el kanban de proveedor? Reutiliza la MISMA fuente que la
+   * lista de aprobadores (rol "conta" + jerarquía 3/4, cross-sistema): puede
+   * aprobar si su id está en esa lista. Así los botones del front coinciden
+   * exactamente con los aprobadores válidos (sin depender del rol del contexto).
+   */
+  async puedeAprobarProveedorKanban(usuarioId: string): Promise<boolean> {
+    const id = (usuarioId ?? '').trim();
+    if (!id) return false;
+    const aprobadores = await this.listarAprobadoresProveedorKanban();
+    return aprobadores.some((u) => u.id === id);
   }
 }

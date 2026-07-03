@@ -1,5 +1,6 @@
 import { UsuarioExternoResponse } from '../../dominio/entidades/UsuarioExterno';
 import { IUsuarioExternoRepository } from '../../dominio/repositorios/IUsuarioExternoRepository';
+import { logger } from '../../infraestructura/logging';
 
 /** Aprobador del kanban proveedor: rol cuyo NOMBRE contiene "conta". */
 export const ROL_REGEX_APROBADOR_PROVEEDOR = 'conta';
@@ -66,15 +67,62 @@ export class UsuarioExternoService {
   }
 
   /**
-   * ¿Puede aprobar en el kanban de proveedor? Reutiliza la MISMA fuente que la
-   * lista de aprobadores (rol "conta" + jerarquía 3/4, cross-sistema): puede
-   * aprobar si su id está en esa lista. Así los botones del front coinciden
-   * exactamente con los aprobadores válidos (sin depender del rol del contexto).
+   * ¿Puede aprobar en el kanban de proveedor? Regla (paridad inacons): rol con
+   * "conta" O cargo con jerarquía 3 (Supervisor) / 4 (Gerencia).
+   *
+   * Fuente de datos: rol y jerarquía vienen de los CLAIMS del token (ya
+   * decodificados en el contexto GraphQL). NO se llama a auth: `getUsuarioById`
+   * y `getUsuariosByRolCargo` exigen sesión/secreto interno que esta llamada
+   * directa no tiene (→ "Acceso denegado"). Con los claims basta y se evita el
+   * viaje de red.
    */
-  async puedeAprobarProveedorKanban(usuarioId: string): Promise<boolean> {
+  async puedeAprobarProveedorKanban(
+    usuarioId: string,
+    roleNombre?: string | null,
+    cargoGerarquia?: number | null
+  ): Promise<boolean> {
     const id = (usuarioId ?? '').trim();
     if (!id) return false;
-    const aprobadores = await this.listarAprobadoresProveedorKanban();
-    return aprobadores.some((u) => u.id === id);
+
+    const rolNormalizado = (roleNombre ?? '').trim().toLowerCase();
+    const gerarquia =
+      typeof cargoGerarquia === 'number' && Number.isFinite(cargoGerarquia)
+        ? cargoGerarquia
+        : null;
+
+    const puedeAprobar = usuarioPuedeAprobarProveedorKanban({
+      roleNombre: rolNormalizado,
+      cargoGerarquia: gerarquia,
+    });
+
+    const matchRol = rolNormalizado.includes(
+      ROL_REGEX_APROBADOR_PROVEEDOR.toLowerCase()
+    );
+    const matchGerarquia =
+      gerarquia != null &&
+      (JERARQUIAS_APROBADOR_PROVEEDOR as readonly number[]).includes(gerarquia);
+
+    logger.info('[puedeAprobarProveedorKanban] Evaluando permiso de aprobación', {
+      usuarioId: id,
+      entrada: {
+        roleNombreRecibido: roleNombre ?? null,
+        cargoGerarquia: gerarquia,
+      },
+      comparaciones: {
+        regla1_rolIncluye: {
+          valor: rolNormalizado || '(vacío)',
+          busca: ROL_REGEX_APROBADOR_PROVEEDOR,
+          resultado: matchRol,
+        },
+        regla2_gerarquiaAprobadora: {
+          valor: gerarquia,
+          busca: [...JERARQUIAS_APROBADOR_PROVEEDOR],
+          resultado: matchGerarquia,
+        },
+      },
+      resultadoFinal: puedeAprobar,
+    });
+
+    return puedeAprobar;
   }
 }

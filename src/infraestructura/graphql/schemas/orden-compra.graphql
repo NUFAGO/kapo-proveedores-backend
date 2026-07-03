@@ -130,11 +130,47 @@ type OrdenCompraPaginatedResponse {
   totalPages: Int!
 }
 
+# ============================================================================
+# Variante LEAN para `revision-asignacion/ordenes-compra` (solo servicios).
+# Solo los campos que usa el FE; el proveedor se hidrata en ESTE MS.
+# ============================================================================
+
+type OcRevisionProveedor {
+  id: ID!
+  nombre_comercial: String
+}
+
+type OrdenCompraRevision {
+  id: ID!
+  codigo_orden: String
+  descripcion: String
+  estado: String
+  total: Float
+  fecha_ini: DateTime
+  fecha_fin: DateTime
+  tiene_expediente: Boolean
+  proveedor_id: ID
+  proveedor: OcRevisionProveedor
+}
+
+type OrdenCompraRevisionPaginatedResponse {
+  data: [OrdenCompraRevision!]!
+  total: Int!
+  page: Int!
+  limit: Int!
+  totalPages: Int!
+}
+
 # Consultas disponibles
 type Query {
   listOrdenComprasPaginated(
     filter: OrdenCompraPaginationInput
   ): OrdenCompraPaginatedResponse!
+
+  """Listado LEAN de OC (solo servicios) para revisión/expedientes de Proveedores."""
+  listOrdenComprasServicioRevision(
+    filter: OrdenCompraPaginationInput
+  ): OrdenCompraRevisionPaginatedResponse!
 }
 
 scalar DateTime

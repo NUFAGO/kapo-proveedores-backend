@@ -27,6 +27,15 @@ export class OrdenCompraResolver extends BaseResolver<any> {
             { filter }
           );
         },
+        listOrdenComprasServicioRevision: async (_: any, { filter }: { filter?: any }) => {
+          return await ErrorHandler.handleError(
+            async () => {
+              return await this.ordenCompraService.listOrdenComprasServicioRevision(filter);
+            },
+            'listOrdenComprasServicioRevision',
+            { filter }
+          );
+        },
       },
     };
   }

@@ -38,6 +38,8 @@ export interface OrdenCompraPaginatedResponse {
 
 export interface IOrdenCompraRepository {
   listOrdenComprasPaginated(filter?: OrdenCompraFilter): Promise<OrdenCompraPaginatedResponse>;
+  /** Variante LEAN: solo campos del dominio propio de Compras (proveedor se hidrata en Proveedores). */
+  listOrdenComprasRevision(filter?: OrdenCompraFilter): Promise<OrdenCompraPaginatedResponse>;
   findById(id: string): Promise<any>;
   /** Proveedores → Compras M2M (`actualizarTieneExpediente`). */
   actualizarTieneExpediente(ordenCompraId: string, tieneExpediente: boolean): Promise<void>;

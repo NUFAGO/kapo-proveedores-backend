@@ -1,5 +1,5 @@
 import { IOrdenCompraRepository, OrdenCompraFilter, OrdenCompraPaginatedResponse } from '../../../dominio/repositorios/IOrdenCompraRepository';
-import { COMPRAS_OC_LIST_FIELDS } from '../../../dominio/servicios/OrdenCompraComprasMapper';
+import { COMPRAS_OC_LIST_FIELDS, COMPRAS_OC_REVISION_FIELDS } from '../../../dominio/servicios/OrdenCompraComprasMapper';
 import { BaseHttpRepository } from './BaseHttpRepository';
 
 export class HttpOrdenCompraRepository extends BaseHttpRepository<any> implements IOrdenCompraRepository {
@@ -41,7 +41,31 @@ export class HttpOrdenCompraRepository extends BaseHttpRepository<any> implement
       }
     `;
 
-    const result = await this.graphqlRequest(query, { filter });
+    const result = await this.graphqlRequest(query, { filter }, 'kapo-compras-backend', 'kapo-compras-backend');
+    return result.listOrdenComprasPaginated;
+  }
+
+  /**
+   * Variante LEAN: mismos filtros, pero pide a Compras SOLO campos de su dominio
+   * (sin `requerimiento{}`/`cotizacion_id{}` que Compras hidrata vía otros MS).
+   * El proveedor se resuelve luego en el servicio con nuestra propia data.
+   */
+  async listOrdenComprasRevision(filter?: OrdenCompraFilter): Promise<OrdenCompraPaginatedResponse> {
+    const query = `
+      query ListOrdenComprasPaginated($filter: OrdenCompraPaginationInput) {
+        listOrdenComprasPaginated(filter: $filter) {
+          data {
+            ${COMPRAS_OC_REVISION_FIELDS}
+          }
+          total
+          page
+          limit
+          totalPages
+        }
+      }
+    `;
+
+    const result = await this.graphqlRequest(query, { filter }, 'kapo-compras-backend', 'kapo-compras-backend');
     return result.listOrdenComprasPaginated;
   }
 
@@ -54,7 +78,7 @@ export class HttpOrdenCompraRepository extends BaseHttpRepository<any> implement
       }
     `;
 
-    const result = await this.graphqlRequest(query, { id });
+    const result = await this.graphqlRequest(query, { id }, 'kapo-compras-backend', 'kapo-compras-backend');
     return result.getOrdenCompraById;
   }
 

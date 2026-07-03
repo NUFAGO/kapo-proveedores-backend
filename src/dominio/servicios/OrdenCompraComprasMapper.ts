@@ -134,6 +134,74 @@ export function mapComprasRowToProveedoresOc(
   };
 }
 
+// ============================================================================
+// Variante LEAN para la pantalla `revision-asignacion/ordenes-compra` (solo
+// servicios). Lee de Kapo-Compras UNICAMENTE campos de su propio dominio (sin
+// `requerimiento{}` ni `cotizacion_id{}`, que en Compras se hidratan por HTTP a
+// otros MS y encarecen/rompen la query). El proveedor se hidrata en NUESTRO MS.
+// ============================================================================
+
+/** Campos mínimos de `OrdenCompraConRequerimiento` (dominio propio de Compras). */
+export const COMPRAS_OC_REVISION_FIELDS = `
+  id
+  codigo_orden
+  descripcion
+  estado
+  total
+  fecha_ini
+  fecha_fin
+  tipo
+  tiene_expediente
+  proveedor_id
+`;
+
+export type ComprasOrdenCompraRevisionRow = {
+  id?: string;
+  codigo_orden?: string | null;
+  descripcion?: string | null;
+  estado?: string | null;
+  total?: number | null;
+  fecha_ini?: string | null;
+  fecha_fin?: string | null;
+  tipo?: string | null;
+  tiene_expediente?: boolean | null;
+  proveedor_id?: string | null;
+};
+
+/** Adapta la fila mínima de Compras + proveedor hidratado localmente (solo lo que usa el FE). */
+export function mapComprasRowToOcRevision(
+  row: ComprasOrdenCompraRevisionRow,
+  proveedorById: Map<string, Proveedor>,
+): Record<string, unknown> {
+  const proveedorId = row.proveedor_id?.trim() || '';
+  const proveedor = proveedorId ? proveedorById.get(proveedorId) : undefined;
+  return {
+    id: row.id,
+    codigo_orden: row.codigo_orden ?? null,
+    descripcion: row.descripcion ?? null,
+    estado: row.estado ?? null,
+    total: row.total ?? null,
+    fecha_ini: row.fecha_ini ?? null,
+    fecha_fin: row.fecha_fin ?? null,
+    tiene_expediente: row.tiene_expediente ?? null,
+    proveedor_id: row.proveedor_id ?? null,
+    proveedor: proveedor
+      ? { id: proveedor.id, nombre_comercial: proveedor.nombre_comercial ?? '' }
+      : null,
+  };
+}
+
+export function collectProveedorIdsFromRevisionRows(
+  rows: ComprasOrdenCompraRevisionRow[],
+): string[] {
+  const ids = new Set<string>();
+  for (const row of rows) {
+    const id = row.proveedor_id?.trim();
+    if (id) ids.add(id);
+  }
+  return [...ids];
+}
+
 export function collectProveedorIdsFromComprasRows(rows: ComprasOrdenCompraRow[]): string[] {
   const ids = new Set<string>();
   for (const row of rows) {

@@ -56,6 +56,8 @@ export interface RequisitoDocumento {
     nombrePlantilla: string
     plantillaUrl: string
     activo: boolean
+    fechaCreacion: string
+    fechaActualizacion?: string | null
   }
   formulario?: {
     id: string

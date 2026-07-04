@@ -18,6 +18,10 @@ export class MediosPagoProveedorService {
     return this.repo.listMediosPagoProveedorByProveedor(proveedorId);
   }
 
+  listMediosPagoProveedorByIds(ids: string[]): Promise<MediosPagoProveedor[]> {
+    return this.repo.listMediosPagoProveedorByIds(ids);
+  }
+
   listMediosPagoProveedorNoValidado(
     filter?: MediosPagoNoValidadoFilter
   ): Promise<MediosPagoProveedorPaginatedResponse> {

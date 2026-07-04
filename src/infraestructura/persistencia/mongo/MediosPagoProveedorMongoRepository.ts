@@ -79,6 +79,17 @@ export class MediosPagoProveedorMongoRepository implements IMediosPagoProveedorR
     return docs.map((d) => this.toDomain(d));
   }
 
+  async listMediosPagoProveedorByIds(ids: string[]): Promise<MediosPagoProveedor[]> {
+    const objectIds = [...new Set((ids ?? []).map((id) => String(id ?? '').trim()).filter(Boolean))]
+      .filter((id) => Types.ObjectId.isValid(id))
+      .map((id) => new Types.ObjectId(id));
+    if (!objectIds.length) return [];
+    const docs = await MediosPagoProveedorModel.find({ _id: { $in: objectIds } })
+      .populate('proveedor_id')
+      .populate('entidad');
+    return docs.map((d) => this.toDomain(d));
+  }
+
   async listMediosPagoProveedorLitleBox(): Promise<MediosPagoProveedorLitleBoxGroup[]> {
     const rows = await ProveedorModel.aggregate([
       { $match: { tipo: 'CAJA CHICA' } },

@@ -14,6 +14,7 @@ import {
 export interface IMediosPagoProveedorRepository {
   listMediosPagoProveedores(): Promise<MediosPagoProveedor[]>;
   listMediosPagoProveedorByProveedor(proveedorId: string): Promise<MediosPagoProveedor[]>;
+  listMediosPagoProveedorByIds(ids: string[]): Promise<MediosPagoProveedor[]>;
   listMediosPagoProveedorNoValidado(filter?: MediosPagoNoValidadoFilter): Promise<MediosPagoProveedorPaginatedResponse>;
   listMediosPagoProveedorLitleBox(): Promise<MediosPagoProveedorLitleBoxGroup[]>;
   addMediosPagoProveedor(input: MediosPagoProveedorInput): Promise<MediosPagoProveedor | null>;

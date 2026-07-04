@@ -27,6 +27,12 @@ export class MediosPagoProveedorResolver {
             'listMediosPagoProveedorByProveedor',
             { proveedor_id }
           ),
+        listMediosPagoProveedorByIds: (_: unknown, { ids }: { ids: string[] }) =>
+          ErrorHandler.handleError(
+            () => this.service.listMediosPagoProveedorByIds(ids),
+            'listMediosPagoProveedorByIds',
+            { ids }
+          ),
         listMediosPagoProveedorNoValidado: (_: unknown, args: { page?: number; limit?: number; search?: string }) =>
           ErrorHandler.handleError(
             () => this.service.listMediosPagoProveedorNoValidado(args),

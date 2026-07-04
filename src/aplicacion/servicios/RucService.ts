@@ -55,10 +55,38 @@ export class RucService {
       const res = await fetch(url, {
         headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
       });
-      const json: any = await res.json();
+      const raw = await res.text();
 
-      // apis.net.pe devuelve el objeto plano; en éxito trae razonSocial.
+      // Si apis.net.pe rechaza la petición (401 token inválido, 403 sin plan,
+      // 429 cupo agotado, 5xx) NO debemos silenciarlo como "no encontrado":
+      // hay que registrar el status y el cuerpo real para poder diagnosticar.
+      if (!res.ok) {
+        logger.error('apis.net.pe respondió con error al consultar RUC', {
+          status: res.status,
+          body: raw.slice(0, 500),
+          ruc,
+        });
+        throw new Error(`apis.net.pe HTTP ${res.status}: ${raw.slice(0, 200)}`);
+      }
+
+      let json: any;
+      try {
+        json = JSON.parse(raw);
+      } catch {
+        logger.error('apis.net.pe devolvió una respuesta no-JSON', {
+          status: res.status,
+          body: raw.slice(0, 500),
+          ruc,
+        });
+        throw new Error('apis.net.pe devolvió una respuesta no válida (no JSON)');
+      }
+
+      // 200 OK pero sin razonSocial ⇒ RUC realmente no encontrado.
       if (!json || !json.razonSocial) {
+        logger.warn('RUC no encontrado en apis.net.pe (200 sin razonSocial)', {
+          body: raw.slice(0, 300),
+          ruc,
+        });
         return { success: false, data: null, fromCache: false };
       }
 

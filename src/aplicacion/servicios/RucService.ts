@@ -114,11 +114,9 @@ export class RucService {
 
       return { success: true, data, fromCache: false };
     } catch (error) {
-      logger.error('Error al consultar RUC', {
-        error: error instanceof Error ? error.message : String(error),
-        ruc,
-      });
-      throw new Error('Error al consultar el RUC');
+      const detalle = error instanceof Error ? error.message : String(error);
+      logger.error('Error al consultar RUC', { error: detalle, ruc });
+      throw new Error(`Error al consultar el RUC: ${detalle}`);
     }
   }
 

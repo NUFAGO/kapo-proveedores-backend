@@ -8,7 +8,7 @@ import { ErrorHandler } from './ErrorHandler';
 
 import { adminGuard, serviceTokenGuard } from '../../auth/GraphQLGuards';
 
-import { JWTUtils } from '../../auth/JWTUtils';
+import { JWTUtils, type JWTPayload } from '../../auth/JWTUtils';
 
 import { AprobacionChecklistRevisionService } from '../../../dominio/servicios/AprobacionChecklistRevisionService';
 
@@ -271,25 +271,17 @@ export class ExpedientePagoResolver {
 
         obtenerExpedienteCompleto: async (_: any, { id }: { id: string }, context: any) => {
 
-          // Extraer y validar token
+          // Usuario resuelto en el context (server.ts). No se re-valida el token.
 
-          const token = context.req?.headers?.authorization 
-
-            ? JWTUtils.extractTokenFromHeader(context.req.headers.authorization)
-
-            : null;
+          const payload = context.user as JWTPayload | undefined;
 
 
 
-          if (!token) {
+          if (!payload) {
 
             throw new Error('AUTENTICACION_REQUERIDA: Token de autenticación requerido');
 
           }
-
-
-
-          const payload = JWTUtils.validateToken(token);
 
 
 
@@ -353,25 +345,19 @@ export class ExpedientePagoResolver {
 
         listarExpedientesPago: async (_: any, args: { filter?: ExpedientePagoFilter }, context: any) => {
 
-          // Extraer y validar token
+          // El usuario ya viene resuelto en el context (server.ts): admin desde
+          // los claims del IAM (RS256 ya validado por el gateway) o proveedor
+          // desde su token local (HS256). Aquí NO se re-valida el token.
 
-          const token = context.req?.headers?.authorization 
-
-            ? JWTUtils.extractTokenFromHeader(context.req.headers.authorization)
-
-            : null;
+          const payload = context.user as JWTPayload | undefined;
 
 
 
-          if (!token) {
+          if (!payload) {
 
             throw new Error('AUTENTICACION_REQUERIDA: Token de autenticación requerido');
 
           }
-
-
-
-          const payload = JWTUtils.validateToken(token);
 
 
 
@@ -436,27 +422,17 @@ export class ExpedientePagoResolver {
 
         }, context: any) => {
 
-          // Extraer token del contexto y validar
+          // Usuario resuelto en el context (server.ts). No se re-valida el token.
 
-          const token = context.req?.headers?.authorization 
-
-            ? JWTUtils.extractTokenFromHeader(context.req.headers.authorization)
-
-            : null;
+          const payload = context.user as JWTPayload | undefined;
 
 
 
-          if (!token) {
+          if (!payload) {
 
             throw new Error('AUTENTICACION_REQUERIDA: Token de autenticación requerido');
 
           }
-
-
-
-          // Validar el token
-
-          const payload = JWTUtils.validateToken(token);
 
 
 
